@@ -1,0 +1,107 @@
+name: disbattery_trade
+description: "Aplicación móvil para gestión de rutas de mercaderistas de Disbattery"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase
+  supabase_flutter: ^2.0.0
+
+  # State Management
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.3.3
+
+  # Navigation
+  go_router: ^13.0.0
+
+  # Maps & Location
+  google_maps_flutter: ^2.5.0
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0
+
+  # Camera & Images
+  image_picker: ^1.0.7
+  camera: ^0.10.5
+  image: ^4.1.0
+  flutter_image_compress: ^2.1.0
+
+  # Local Storage
+  sqflite: ^2.3.0
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.0
+  path: ^1.8.3
+
+  # Network & Connectivity
+  dio: ^5.4.0
+  connectivity_plus: ^5.0.2
+
+  # UI Components
+  flutter_svg: ^2.0.9
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  cupertino_icons: ^1.0.8
+
+  # Utilities
+  intl: any
+  uuid: ^4.2.0
+  permission_handler: ^11.0.0
+  flutter_local_notifications: ^18.0.0
+  url_launcher: ^6.2.2
+
+  # Forms & Validation
+  flutter_form_builder: ^10.2.0
+  form_builder_validators: ^11.0.0
+
+  # Charts & Analytics
+  fl_chart: ^0.66.0
+
+  # PDF Generation
+  pdf: ^3.10.0
+  printing: ^5.11.0
+
+  # JSON Serialization
+  json_annotation: ^4.8.1
+  freezed_annotation: ^2.4.1
+
+  # Calendario
+  table_calendar: ^3.1.0
+
+  # Drag & Drop
+  reorderable_grid_view: ^2.2.8
+
+  # Date Picker
+  flutter_datetime_picker_plus: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.0
+  mockito: ^5.4.0
+  json_serializable: ^6.7.1
+  freezed: ^2.4.5
+  riverpod_generator: ^2.3.9
+  riverpod_lint: ^2.3.7
+
+flutter:
+  uses-material-design: true
+
+  # Assets
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  # Fonts
+  # fonts:
+  #   - family: Roboto
+  #     fonts:
+  #       - asset: assets/fonts/Roboto-Regular.ttf
+  #       - asset: assets/fonts/Roboto-Bold.ttf
+  #         weight: 700
