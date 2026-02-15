@@ -94,6 +94,11 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen> {
         title: const Text('Clientes'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.map),
+            tooltip: 'Ver en Mapa',
+            onPressed: () => context.push('/admin/clients/map'),
+          ),
+          IconButton(
             icon: const Icon(Icons.add_circle),
             tooltip: 'Nuevo Cliente',
             onPressed: () => _showCreateClientDialog(context),

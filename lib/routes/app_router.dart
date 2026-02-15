@@ -10,6 +10,7 @@ import '../presentation/screens/admin/user_detail_screen.dart';
 import '../presentation/screens/admin/create_user_screen.dart';
 import '../presentation/screens/clients/clients_list_screen.dart';
 import '../presentation/screens/clients/client_detail_screen.dart';
+import '../presentation/screens/clients/clients_map_screen.dart';
 import '../presentation/screens/routes/route_calendar_screen.dart';
 import '../presentation/screens/routes/create_edit_route_screen.dart';
 import '../presentation/screens/routes/route_execution_screen.dart';
@@ -80,6 +81,11 @@ class AppRouter {
             path: 'clients',
             name: 'clients_list',
             builder: (context, state) => const ClientsListScreen(),
+          ),
+          GoRoute(
+            path: 'clients/map',
+            name: 'clients_map',
+            builder: (context, state) => const ClientsMapScreen(),
           ),
           GoRoute(
             path: 'clients/:coCli',
