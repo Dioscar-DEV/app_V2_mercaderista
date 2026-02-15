@@ -70,10 +70,20 @@ class AppConstants {
   // Sedes/Sucursales de Disbattery
   static const Map<String, List<String>> sedes = {
     'GRUPO DISBATTERY': [
+      'Caracas',
       'Falcon',
       'Aragua',
       'Lara',
-      'Caracas',
+      'Miranda',
+      'Portuguesa',
+      'Yaracuy',
+    ],
+    'OCEANO PACIFICO': [
+      'El Tigre',
+      'Puerto La Cruz',
+      'Maturin',
+      'Puerto Ordaz',
+      'Margarita',
     ],
     'BLITZ 2000': [
       'Valencia',
@@ -87,22 +97,24 @@ class AppConstants {
       'Barinas',
       'Merida',
     ],
-    'DISBATTERY': [
-      'El Tigre',
-      'Puerto La Cruz',
-      'Maturin',
-      'Puerto Ordaz',
-      'Margarita',
-    ],
   };
 
   // Todas las sucursales (lista plana)
   static const List<String> allSucursales = [
     // GRUPO DISBATTERY
+    'Caracas',
     'Falcon',
     'Aragua',
     'Lara',
-    'Caracas',
+    'Miranda',
+    'Portuguesa',
+    'Yaracuy',
+    // OCEANO PACIFICO
+    'El Tigre',
+    'Puerto La Cruz',
+    'Maturin',
+    'Puerto Ordaz',
+    'Margarita',
     // BLITZ 2000
     'Valencia',
     'Calabozo',
@@ -113,12 +125,6 @@ class AppConstants {
     'VG-SBZ',
     'Barinas',
     'Merida',
-    // DISBATTERY
-    'El Tigre',
-    'Puerto La Cruz',
-    'Maturin',
-    'Puerto Ordaz',
-    'Margarita',
   ];
 
   // Estados de Venezuela
@@ -144,7 +150,7 @@ class AppConstants {
     'Sucre',
     'Táchira',
     'Trujillo',
-    'Vargas',
+    'La Guaira',
     'Yaracuy',
     'Zulia',
   ];

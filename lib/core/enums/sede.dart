@@ -1,9 +1,9 @@
 /// Regiones geográficas de operación
 enum Region {
-  centroCapital('centro_capital', 'Centro-Capital'),
-  oriente('oriente', 'Oriente'),
-  centroLosLlanos('centro_los_llanos', 'Centro-Los Llanos'),
-  occidente('occidente', 'Occidente');
+  centroCapital('centro_capital', 'Zona Metropolitana y Centro'),
+  oriente('oriente', 'Zona Oriente'),
+  centroLosLlanos('centro_los_llanos', 'Zona Centro'),
+  occidente('occidente', 'Zona Occidente');
 
   const Region(this.value, this.displayName);
 
@@ -36,19 +36,19 @@ enum Region {
 }
 
 /// Sedes de operación de Disbattery
-/// 
+///
 /// Cada sede pertenece a una región y cubre estados específicos de Venezuela
 enum Sede {
-  // CENTRO-CAPITAL
+  // ZONA METROPOLITANA Y CENTRO
   grupoDisbattery('grupo_disbattery', 'Grupo Disbattery', Region.centroCapital),
-  
-  // ORIENTE
-  disbattery('disbattery', 'Disbattery', Region.oriente),
-  
-  // CENTRO-LOS LLANOS
+
+  // ZONA ORIENTE
+  oceanoPacifico('oceano_pacifico', 'Oceano Pacifico', Region.oriente),
+
+  // ZONA CENTRO
   blitz2000('blitz_2000', 'Blitz 2000', Region.centroLosLlanos),
-  
-  // OCCIDENTE
+
+  // ZONA OCCIDENTE
   grupoVictoria('grupo_victoria', 'Grupo Victoria', Region.occidente);
 
   const Sede(this.value, this.displayName, this.region);
@@ -62,8 +62,10 @@ enum Sede {
     switch (value.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_')) {
       case 'grupo_disbattery':
         return Sede.grupoDisbattery;
-      case 'disbattery':
-        return Sede.disbattery;
+      case 'oceano_pacifico':
+        return Sede.oceanoPacifico;
+      case 'disbattery': // backward compatibility
+        return Sede.oceanoPacifico;
       case 'blitz_2000':
       case 'blitz2000':
         return Sede.blitz2000;
@@ -88,13 +90,13 @@ enum Sede {
   List<String> get estados {
     switch (this) {
       case Sede.grupoDisbattery:
-        return ['Distrito Capital', 'Miranda', 'Vargas'];
-      case Sede.disbattery:
-        return ['Aragua', 'Anzoátegui', 'Bolívar', 'Monagas', 'Sucre', 'Nueva Esparta'];
+        return ['Amazonas', 'Aragua', 'Distrito Capital', 'Falcón', 'La Guaira', 'Lara', 'Miranda', 'Portuguesa', 'Yaracuy'];
+      case Sede.oceanoPacifico:
+        return ['Anzoátegui', 'Bolívar', 'Delta Amacuro', 'Monagas', 'Nueva Esparta', 'Sucre'];
       case Sede.blitz2000:
-        return ['Carabobo', 'Guárico', 'Lara', 'Yaracuy', 'Falcón', 'Zulia', 'Táchira', 'Mérida', 'Trujillo'];
+        return ['Apure', 'Carabobo', 'Cojedes', 'Guárico'];
       case Sede.grupoVictoria:
-        return ['Cojedes', 'Portuguesa', 'Barinas', 'Apure', 'Amazonas', 'Delta Amacuro'];
+        return ['Barinas', 'Mérida', 'Táchira', 'Trujillo', 'Zulia'];
     }
   }
 

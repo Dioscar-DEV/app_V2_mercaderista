@@ -16,22 +16,22 @@ class ExternalClientApiService {
   
   /// Mapeo de códigos de sede de la API a nuestras sedes de la app
   static const Map<int, String> sedeMapping = {
-    1: 'grupo_disbattery',  // Valencia
-    2: 'grupo_disbattery',  // Valencia
-    3: 'blitz_2000',        // Calabozo
-    4: 'grupo_disbattery',  // Girardot
-    5: 'grupo_victoria',    // Carirubana
-    6: 'grupo_disbattery',  // Distrito Capital
-    7: 'grupo_victoria',    // Iribarren
-    8: 'disbattery',        // Porlamar
-    9: 'disbattery',        // Maturin
-    10: 'disbattery',       // Barcelona
-    11: 'disbattery',       // Guayana
-    12: 'grupo_victoria',   // San Cristobal
-    13: 'grupo_victoria',   // Merida
-    14: 'grupo_victoria',   // Maracaibo
-    15: 'blitz_2000',       // Barinas
-    16: 'grupo_victoria',   // Valera
+    1: 'blitz_2000',          // Valencia (Carabobo)
+    2: 'blitz_2000',          // Valencia (Carabobo)
+    3: 'blitz_2000',          // Calabozo (Guárico)
+    4: 'grupo_disbattery',    // Girardot (Aragua)
+    5: 'grupo_disbattery',    // Carirubana (Falcón)
+    6: 'grupo_disbattery',    // Distrito Capital
+    7: 'grupo_disbattery',    // Iribarren (Lara)
+    8: 'oceano_pacifico',     // Porlamar (Nueva Esparta)
+    9: 'oceano_pacifico',     // Maturin (Monagas)
+    10: 'oceano_pacifico',    // Barcelona (Anzoátegui)
+    11: 'oceano_pacifico',    // Guayana (Bolívar)
+    12: 'grupo_victoria',     // San Cristobal (Táchira)
+    13: 'grupo_victoria',     // Merida (Mérida)
+    14: 'grupo_victoria',     // Maracaibo (Zulia)
+    15: 'grupo_victoria',     // Barinas (Barinas)
+    16: 'grupo_victoria',     // Valera (Trujillo)
   };
 
   /// Obtiene todas las sedes con el conteo de clientes
