@@ -97,24 +97,10 @@ class _LoginScreenNewState extends ConsumerState<LoginScreenNew> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // Logo de Disbattery
-                          Container(
-                            width: 200,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              gradient: ThemeConfig.disbatteryGradient,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'DISBATTERY',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ),
+                          Image.asset(
+                            'assets/images/disbattery_login.png',
+                            width: 280,
+                            fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 30),
 

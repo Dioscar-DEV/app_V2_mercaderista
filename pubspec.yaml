@@ -89,6 +89,7 @@ dev_dependencies:
   freezed: ^2.4.5
   riverpod_generator: ^2.3.9
   riverpod_lint: ^2.3.7
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -105,3 +106,10 @@ flutter:
   #       - asset: assets/fonts/Roboto-Regular.ttf
   #       - asset: assets/fonts/Roboto-Bold.ttf
   #         weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/disbattery_logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/disbattery_logo.png"

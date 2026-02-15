@@ -69,13 +69,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo de la aplicación
+              // Logo de Disbattery
               Container(
-                width: 120,
-                height: 120,
+                width: 140,
+                height: 140,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -84,11 +84,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                     ),
                   ],
                 ),
-                child: Center(
-                  child: Icon(
-                    Icons.route,
-                    size: 60,
-                    color: Theme.of(context).colorScheme.primary,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      'assets/images/disbattery_logo.png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
