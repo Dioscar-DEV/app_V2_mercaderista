@@ -262,9 +262,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       title: 'Reportes',
                       subtitle: 'Analytics y reportes',
                       color: Colors.green,
-                      onTap: () {
-                        // TODO: Navegar a reportes
-                      },
+                      onTap: () => context.push('/admin/reports'),
                     ),
                     _ModuleCard(
                       icon: Icons.logout,

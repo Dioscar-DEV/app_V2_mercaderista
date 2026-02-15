@@ -18,6 +18,11 @@ import '../presentation/screens/admin/events/event_list_screen.dart';
 import '../presentation/screens/admin/events/create_edit_event_screen.dart';
 import '../presentation/screens/admin/events/event_detail_screen.dart';
 import '../presentation/screens/events/event_check_in_screen.dart';
+import '../presentation/screens/admin/reports/reports_dashboard_screen.dart';
+import '../presentation/screens/admin/reports/mercaderistas_report_screen.dart';
+import '../presentation/screens/admin/reports/client_coverage_report_screen.dart';
+import '../presentation/screens/admin/reports/routes_report_screen.dart';
+import '../presentation/screens/admin/reports/events_report_screen.dart';
 
 /// Configuración de rutas de la aplicación
 class AppRouter {
@@ -121,6 +126,34 @@ class AppRouter {
               final routeId = state.pathParameters['id']!;
               return CreateEditRouteScreen(routeId: routeId);
             },
+          ),
+          // Reportes
+          GoRoute(
+            path: 'reports',
+            name: 'reports_dashboard',
+            builder: (context, state) => const ReportsDashboardScreen(),
+            routes: [
+              GoRoute(
+                path: 'mercaderistas',
+                name: 'reports_mercaderistas',
+                builder: (context, state) => const MercaderistasReportScreen(),
+              ),
+              GoRoute(
+                path: 'clients',
+                name: 'reports_clients',
+                builder: (context, state) => const ClientCoverageReportScreen(),
+              ),
+              GoRoute(
+                path: 'routes',
+                name: 'reports_routes',
+                builder: (context, state) => const RoutesReportScreen(),
+              ),
+              GoRoute(
+                path: 'events',
+                name: 'reports_events',
+                builder: (context, state) => const EventsReportScreen(),
+              ),
+            ],
           ),
           // Gestión de eventos
           GoRoute(
