@@ -16,12 +16,17 @@ Aplicacion movil para la gestion de rutas y visitas de mercaderistas de **Grupo 
 8. [Como funciona el modo offline](#como-funciona-el-modo-offline)
 9. [Flujo de la aplicacion](#flujo-de-la-aplicacion)
 10. [Pantallas principales](#pantallas-principales)
-11. [Modelos de datos](#modelos-de-datos)
-12. [Gestion de estado con Riverpod](#gestion-de-estado-con-riverpod)
-13. [GPS y permisos](#gps-y-permisos)
-14. [Captura de fotos](#captura-de-fotos)
-15. [Configuracion y despliegue](#configuracion-y-despliegue)
-16. [Dependencias principales](#dependencias-principales)
+11. [Modulo de Eventos](#modulo-de-eventos)
+12. [Modulo de Reportes y Analytics](#modulo-de-reportes-y-analytics)
+13. [Formularios dinamicos por tipo de ruta](#formularios-dinamicos-por-tipo-de-ruta)
+14. [Permisos por sede](#permisos-por-sede)
+15. [Branding y logos](#branding-y-logos)
+16. [Modelos de datos](#modelos-de-datos)
+17. [Gestion de estado con Riverpod](#gestion-de-estado-con-riverpod)
+18. [GPS y permisos](#gps-y-permisos)
+19. [Captura de fotos](#captura-de-fotos)
+20. [Configuracion y despliegue](#configuracion-y-despliegue)
+21. [Dependencias principales](#dependencias-principales)
 
 ---
 
@@ -186,6 +191,7 @@ lib/
 |       +-- route_type.dart      # Tipos de ruta
 |       +-- route_visit.dart     # Visita + Respuestas
 |       +-- user.dart            # Usuario de la app
+|       +-- report_models.dart   # Modelos de reportes y analytics
 |
 +-- data/                        # Capa de datos
 |   +-- local/                   # Almacenamiento local
@@ -199,6 +205,7 @@ lib/
 |   |   +-- offline_first_route_repository.dart  # Rutas con soporte offline
 |   |   +-- route_repository.dart          # Rutas directo a Supabase
 |   |   +-- user_repository.dart           # CRUD de usuarios
+|   |   +-- reports_repository.dart        # Queries de reportes y analytics
 |   |
 |   +-- services/                # Servicios externos
 |       +-- external_client_api_service.dart  # API externa de clientes
@@ -210,12 +217,21 @@ lib/
 |   |   +-- client_provider.dart # Estado de clientes
 |   |   +-- route_provider.dart  # Estado de rutas (el mas complejo)
 |   |   +-- user_provider.dart   # Estado de usuarios
+|   |   +-- reports_provider.dart # Estado de reportes y filtros
 |   |
 |   +-- screens/                 # Pantallas
 |   |   +-- auth/                # Login, registro
 |   |   +-- admin/               # Panel admin/supervisor
+|   |   |   +-- reports/         # Modulo de reportes
+|   |   |       +-- reports_dashboard_screen.dart       # Dashboard KPIs + graficos
+|   |   |       +-- mercaderistas_report_screen.dart    # Rendimiento mercaderistas
+|   |   |       +-- client_coverage_report_screen.dart  # Cobertura de clientes
+|   |   |       +-- routes_report_screen.dart           # Analisis de rutas
+|   |   |       +-- events_report_screen.dart           # Analisis de eventos
+|   |   |       +-- form_answers_screen.dart            # Respuestas + exportar CSV
 |   |   +-- clients/             # Lista y detalle de clientes
 |   |   +-- mercaderista/        # Home del mercaderista
+|   |   |   +-- event_checkin_screen.dart  # Check-in en eventos
 |   |   +-- routes/              # Ejecucion de rutas
 |   |   +-- splash/              # Pantalla de carga inicial
 |   |
@@ -318,6 +334,24 @@ lib/
 |  route_templates          Plantillas reutilizables            |
 |  +-- name                 Nombre de la plantilla              |
 |  +-- client_ids           Clientes incluidos                  |
+|                                                               |
+|  events                   Eventos especiales                  |
+|  +-- id (uuid)            ID unico                            |
+|  +-- name                 Nombre del evento                   |
+|  +-- description          Descripcion                         |
+|  +-- start_date           Fecha de inicio                     |
+|  +-- end_date             Fecha de fin                        |
+|  +-- sede_app             Sede asignada                       |
+|  +-- status               active/completed/cancelled          |
+|  +-- created_by           Usuario que creo el evento          |
+|                                                               |
+|  event_check_ins          Check-ins de mercaderistas          |
+|  +-- id (uuid)            ID unico                            |
+|  +-- event_id             A que evento pertenece              |
+|  +-- mercaderista_id      Quien hizo check-in                 |
+|  +-- checked_in_at        Fecha/hora del check-in             |
+|  +-- latitude/longitude   Coordenadas GPS                     |
+|  +-- notes                Observaciones                       |
 |                                                               |
 +--------------------------------------------------------------+
 ```
@@ -616,6 +650,196 @@ Panel de control para administradores con acceso a:
 
 ### 6. Route Calendar Screen (`routes/route_calendar_screen.dart`)
 Calendario semanal donde se ven las rutas planificadas. Permite crear nuevas rutas y ver el estado de las existentes.
+
+### 7. Client Map Screen (`clients/client_map_screen.dart`)
+Mapa interactivo de Google Maps que muestra la ubicacion de todos los clientes con marcadores. Permite ver la distribucion geografica de los clientes y navegar al detalle de cada uno.
+
+### 8. Reports Dashboard (`admin/reports/reports_dashboard_screen.dart`)
+Panel central de reportes con KPIs, graficos de tendencia, distribucion por tipo de ruta y accesos rapidos a reportes detallados. Solo visible para admin y supervisores.
+
+### 9. Event Check-in Screen (`mercaderista/event_checkin_screen.dart`)
+Pantalla para que el mercaderista haga check-in en eventos asignados. Muestra los eventos activos con su periodo de vigencia y un boton de check-in que captura GPS.
+
+---
+
+## Modulo de Eventos
+
+El sistema de eventos permite a los administradores crear eventos especiales (lanzamientos, promociones, activaciones) y asignar mercaderistas para que hagan check-in presencial con captura de GPS.
+
+### Flujo de eventos
+
+```
+1. Admin crea un evento con nombre, fecha inicio/fin y sede
+2. El sistema asocia mercaderistas del tipo "Evento" al evento
+3. El mercaderista ve el evento en su pantalla de check-in
+4. Llega al lugar del evento y presiona "Check-in"
+5. Se capturan coordenadas GPS y hora del check-in
+6. El admin ve estadisticas de asistencia en Reportes > Eventos
+```
+
+### Tablas involucradas
+
+- **`events`**: Evento con nombre, descripcion, fechas, sede
+- **`event_check_ins`**: Registro de check-in con GPS y timestamp
+
+### Pantallas
+
+| Pantalla | Ruta | Descripcion |
+|---|---|---|
+| Event Check-in | `/events/checkin` | Mercaderista hace check-in en eventos |
+| Events Report | `/admin/reports/events` | Admin ve estadisticas de asistencia |
+
+---
+
+## Modulo de Reportes y Analytics
+
+Modulo completo de reportes para administradores y supervisores, con graficos interactivos usando `fl_chart`, filtros por fecha y sede, y exportacion CSV.
+
+### Dashboard Principal (`/admin/reports`)
+
+El dashboard muestra un resumen general con:
+
+1. **KPIs Grid** (4 tarjetas):
+   - Rutas Completadas: total y porcentaje de completitud
+   - Visitas Realizadas: total de visitas en el periodo
+   - Clientes Alcanzados: clientes unicos visitados
+   - Eventos: check-ins realizados vs asignados
+
+2. **Grafico de Tendencia** (LineChart):
+   - Linea azul: rutas completadas por dia
+   - Linea verde: visitas realizadas por dia
+   - Periodo configurable: 7d, 30d, mes
+
+3. **Distribucion por Tipo de Ruta** (PieChart):
+   - Merchandising (verde), Impulso (naranja), Evento (morado)
+   - Muestra cantidad y porcentaje de cada tipo
+
+4. **Accesos Rapidos** a reportes detallados
+
+### Pantallas de Reportes
+
+| Pantalla | Ruta | Que muestra |
+|---|---|---|
+| Dashboard | `/admin/reports` | KPIs, graficos, resumen general |
+| Mercaderistas | `/admin/reports/mercaderistas` | Ranking por rendimiento, tasa de completitud, grafico de barras comparativo |
+| Clientes | `/admin/reports/clients` | Cobertura de clientes, visitados vs no visitados, grafico de dona, cobertura por sede |
+| Rutas | `/admin/reports/routes` | Analisis de rutas por tipo y estado, historial de rutas con detalle |
+| Eventos | `/admin/reports/events` | Estadisticas de asistencia, check-ins por evento |
+| Respuestas | `/admin/reports/answers` | Respuestas de formularios agrupadas por visita, exportacion CSV |
+
+### Filtros Disponibles
+
+- **Periodo**: Hoy, 7 dias, 30 dias, Este mes
+- **Sede** (solo para owner/admin): grupo_disbattery, disbattery, blitz_2000, grupo_victoria
+
+### Exportacion CSV
+
+La pantalla de Respuestas de Formularios permite exportar todas las respuestas a un archivo CSV con las columnas:
+```
+Mercaderista, Cliente, Tipo Ruta, Sede, Fecha, Hora, Pregunta, Tipo Pregunta, Respuesta
+```
+
+El archivo se genera localmente y se comparte usando el dialogo nativo de compartir del dispositivo (`share_plus`).
+
+### Arquitectura de Reportes
+
+```
+reports_provider.dart          -> Providers Riverpod con filtros
+     |
+     v
+reports_repository.dart        -> Queries directos a Supabase (sin RPC)
+     |
+     v
+report_models.dart             -> Modelos: DashboardStats, DailyTrend,
+                                   MercaderistaPerformance, ClientCoverageStats,
+                                   RouteTypeBreakdown, EventsStats, FormAnswerRow
+```
+
+---
+
+## Formularios dinamicos por tipo de ruta
+
+Cada tipo de ruta tiene su propio conjunto de preguntas configurables en la tabla `route_form_questions`. El formulario se construye dinamicamente segun el tipo de ruta asignado.
+
+### Tipos de preguntas soportados
+
+| Tipo | Widget | Ejemplo |
+|---|---|---|
+| `text` / `textarea` | Campo de texto | "Observaciones generales" |
+| `number` / `number_photo` | Campo numerico + foto opcional | "Cantidad de producto en exhibicion" |
+| `boolean` / `boolean_photo` | Switch Si/No + foto opcional | "El producto esta visible?" |
+| `select` | Radio buttons | "Estado del exhibidor: Bueno/Regular/Malo" |
+| `dynamic_list` | Lista dinamica | Seleccion de productos Shell/Qualid |
+| `photo` | Captura de foto | "Foto de la exhibicion" |
+
+### Formularios por tipo de ruta
+
+| Tipo de Ruta | # Preguntas | Ejemplos |
+|---|---|---|
+| **Merchandising** | 24 | Exhibicion, stock, precios, fotos de estante |
+| **Impulso** | Variable | Preguntas con listas dinamicas de productos Shell/Qualid |
+| **Evento** | Variable | Preguntas especificas del evento |
+
+---
+
+## Permisos por sede
+
+La app implementa un sistema de permisos basado en la sede (`sede_app`) del usuario para controlar la visibilidad de datos.
+
+### Sedes disponibles
+
+| Sede | Valor en BD |
+|---|---|
+| Grupo Disbattery | `grupo_disbattery` |
+| Disbattery | `disbattery` |
+| Blitz 2000 | `blitz_2000` |
+| Grupo Victoria | `grupo_victoria` |
+
+### Matriz de permisos
+
+| Rol | Datos que ve | Filtro de sede |
+|---|---|---|
+| **Owner/Admin** | Todas las sedes | Selector de sede en reportes (puede ver todo o filtrar por una) |
+| **Supervisor** | Solo su sede | Automatico - la sede se fuerza desde su perfil |
+| **Mercaderista** | Solo sus rutas | Filtrado por `mercaderista_id` |
+
+### Implementacion tecnica
+
+- El `reportsFilterProvider` auto-detecta el rol del usuario al inicializarse
+- Si es supervisor: fuerza su sede en el filtro
+- Si es owner: sede null = ve todo, con opcion de filtrar por sede
+- Todas las queries del repositorio de reportes reciben el parametro `sede` y filtran en consecuencia
+- Las tablas `route_visits` y `event_check_ins` no tienen campo `sede_app`, se filtran indirectamente via `route_id` o `event_id`
+
+---
+
+## Branding y logos
+
+La app usa la identidad visual de **Disbattery Lubricantes** con logos personalizados:
+
+### Imagenes
+
+| Imagen | Ubicacion | Uso |
+|---|---|---|
+| `disbattery_logo.png` | `assets/images/` | Icono de app (mipmap), pantalla splash |
+| `disbattery_login.png` | `assets/images/` | Logo horizontal en pantalla de login |
+
+### Icono de la app
+
+Generado automaticamente con `flutter_launcher_icons` a partir del logo circular "D" de Disbattery. Genera todos los tamaños de mipmap para Android (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi) con soporte para iconos adaptativos (fondo blanco + icono en primer plano).
+
+### Pantalla de carga (Splash)
+
+Fondo con degradado rojo Disbattery (#DC143C a #8B0000) con el logo circular centrado sobre un fondo blanco redondeado, y texto "Cargando..." debajo.
+
+### Pantalla de login
+
+Tarjeta centrada con:
+- Logo horizontal "DISBATTERY LUBRICANTES" (280px ancho)
+- Subtitulo "Inicie sesion para continuar"
+- Campos de usuario y contrasena
+- Boton con degradado rojo Disbattery
+- Link de recuperacion de contrasena
 
 ---
 
@@ -975,11 +1199,18 @@ flutter pub cache repair
 | Paquete | Version | Para que |
 |---|---|---|
 | `flutter_form_builder` | ^10.2.0 | Formularios avanzados |
-| `fl_chart` | ^0.66.0 | Graficos y estadisticas |
+| `fl_chart` | ^0.66.0 | Graficos y estadisticas (reportes) |
 | `table_calendar` | ^3.1.0 | Calendario de rutas |
 | `shimmer` | ^3.0.0 | Efecto de carga animado |
 | `intl` | - | Formato de fechas y numeros |
 | `uuid` | ^4.2.0 | Generar IDs unicos |
+| `share_plus` | ^10.1.4 | Compartir archivos CSV exportados |
+
+### Desarrollo
+
+| Paquete | Version | Para que |
+|---|---|---|
+| `flutter_launcher_icons` | ^0.14.4 | Generar iconos de la app desde PNG |
 
 ### Colores de la app
 
