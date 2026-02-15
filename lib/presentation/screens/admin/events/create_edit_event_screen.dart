@@ -155,19 +155,20 @@ class _CreateEditEventScreenState extends ConsumerState<CreateEditEventScreen> {
 
       if (isEditing) {
         await repo.updateEvent(event);
-      } else {
-        final created = await repo.createEvent(event);
-        // Asignar mercaderistas
-        await repo.assignMercaderistas(
-          eventId: created.id,
-          mercaderistaIds: _selectedMercaderistaIds,
-        );
-      }
-
-      if (isEditing) {
         await repo.assignMercaderistas(
           eventId: widget.eventId!,
           mercaderistaIds: _selectedMercaderistaIds,
+          event: event,
+          adminName: user.fullName,
+        );
+      } else {
+        final created = await repo.createEvent(event);
+        // Asignar mercaderistas y notificar
+        await repo.assignMercaderistas(
+          eventId: created.id,
+          mercaderistaIds: _selectedMercaderistaIds,
+          event: created,
+          adminName: user.fullName,
         );
       }
 

@@ -7,6 +7,7 @@ import '../../core/models/route_visit.dart';
 import '../../core/models/user.dart';
 import '../../core/enums/route_status.dart';
 import '../../core/enums/user_role.dart';
+import 'notification_repository.dart';
 
 /// Filtros para búsqueda de rutas
 class RouteFilters {
@@ -183,14 +184,35 @@ class RouteRepository {
   }
 
   /// Crea una nueva ruta
-  Future<AppRoute> createRoute(AppRoute route) async {
+  Future<AppRoute> createRoute(AppRoute route, {String? adminName}) async {
     final response = await _client
         .from('routes')
         .insert(route.toInsertJson())
         .select()
         .single();
 
-    return AppRoute.fromJson(response);
+    final created = AppRoute.fromJson(response);
+
+    // Notificar al mercaderista
+    try {
+      await NotificationRepository(client: _client).createNotification(
+        userId: route.mercaderistaId,
+        title: 'Nueva ruta asignada',
+        body: 'Ruta ${route.name} para el ${_formatDate(route.scheduledDate)} con ${route.totalClients} clientes',
+        type: 'route_assigned',
+        data: {
+          'route_id': created.id,
+          'fecha_ruta': _formatDate(route.scheduledDate),
+          'puntos_cantidad': route.totalClients,
+          'admin_nombre': adminName ?? 'Supervisor',
+          'sede': route.sedeApp ?? '',
+        },
+      );
+    } catch (_) {
+      // No bloquear creación si falla la notificación
+    }
+
+    return created;
   }
 
   /// Actualiza una ruta existente
@@ -248,7 +270,43 @@ class RouteRepository {
         .select()
         .single();
 
-    return AppRoute.fromJson(response);
+    final completed = AppRoute.fromJson(response);
+
+    // Notificar al supervisor que creó la ruta
+    try {
+      if (completed.createdBy != null) {
+        // Obtener nombre del mercaderista
+        final mercUser = await _client
+            .from('users')
+            .select('full_name, email, sede')
+            .eq('id', completed.mercaderistaId)
+            .maybeSingle();
+
+        final mercName = mercUser?['full_name'] as String? ?? 'Mercaderista';
+        final mercEmail = mercUser?['email'] as String? ?? '';
+        final now = DateTime.now();
+        final hora = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+        await NotificationRepository(client: _client).createNotification(
+          userId: completed.createdBy!,
+          title: 'Ruta completada',
+          body: '$mercName completó la ruta ${completed.name}',
+          type: 'route_completed',
+          data: {
+            'route_id': completed.id,
+            'mercaderista_nombre': mercName,
+            'mercaderista_email': mercEmail,
+            'fecha_ruta': _formatDate(completed.scheduledDate),
+            'hora_finalizacion': hora,
+            'sede': completed.sedeApp ?? '',
+          },
+        );
+      }
+    } catch (_) {
+      // No bloquear si falla la notificación
+    }
+
+    return completed;
   }
 
   // ========================
@@ -606,6 +664,10 @@ class RouteRepository {
   }
 
   /// Crea una ruta desde una plantilla
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
   Future<AppRoute> createRouteFromTemplate({
     required String templateId,
     required String mercaderistaId,
@@ -613,6 +675,7 @@ class RouteRepository {
     required String? routeTypeId,
     required String sedeApp,
     required String createdBy,
+    String? adminName,
   }) async {
     // Obtener la plantilla con sus clientes
     final templateResponse = await _client
@@ -654,6 +717,25 @@ class RouteRepository {
       }).toList();
 
       await _client.from('route_clients').insert(routeClients);
+    }
+
+    // Notificar al mercaderista
+    try {
+      await NotificationRepository(client: _client).createNotification(
+        userId: mercaderistaId,
+        title: 'Nueva ruta asignada',
+        body: 'Ruta ${template.name} para el ${_formatDate(scheduledDate)} con ${template.clients?.length ?? 0} clientes',
+        type: 'route_assigned',
+        data: {
+          'route_id': route.id,
+          'fecha_ruta': _formatDate(scheduledDate),
+          'puntos_cantidad': template.clients?.length ?? 0,
+          'admin_nombre': adminName ?? 'Supervisor',
+          'sede': sedeApp,
+        },
+      );
+    } catch (_) {
+      // No bloquear si falla
     }
 
     return route;

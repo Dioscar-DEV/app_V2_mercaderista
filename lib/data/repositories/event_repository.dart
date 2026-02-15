@@ -4,6 +4,7 @@ import '../../core/models/event_check_in.dart';
 import '../../core/models/route_form_question.dart';
 import '../../core/models/user.dart';
 import '../../core/enums/user_role.dart';
+import 'notification_repository.dart';
 
 /// Repositorio de eventos (Supabase)
 class EventRepository {
@@ -113,11 +114,26 @@ class EventRepository {
   // MERCADERISTAS EN EVENTO
   // ========================
 
-  /// Asigna mercaderistas a un evento
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  /// Asigna mercaderistas a un evento y notifica a los nuevos
   Future<void> assignMercaderistas({
     required String eventId,
     required List<String> mercaderistaIds,
+    AppEvent? event,
+    String? adminName,
   }) async {
+    // Obtener asignaciones previas para saber quién es nuevo
+    final prevResponse = await _client
+        .from('event_mercaderistas')
+        .select('mercaderista_id')
+        .eq('event_id', eventId);
+    final prevIds = (prevResponse as List)
+        .map((r) => r['mercaderista_id'] as String)
+        .toSet();
+
     // Eliminar asignaciones previas
     await _client
         .from('event_mercaderistas')
@@ -132,6 +148,34 @@ class EventRepository {
       }).toList();
 
       await _client.from('event_mercaderistas').insert(rows);
+    }
+
+    // Notificar solo a los mercaderistas nuevos
+    if (event != null) {
+      final newIds = mercaderistaIds.where((id) => !prevIds.contains(id));
+      final notifRepo = NotificationRepository(client: _client);
+
+      for (final mercId in newIds) {
+        try {
+          await notifRepo.createNotification(
+            userId: mercId,
+            title: 'Nuevo evento asignado',
+            body: 'Evento ${event.name} del ${_formatDate(event.startDate)} al ${_formatDate(event.endDate)}',
+            type: 'event_assigned',
+            data: {
+              'event_id': eventId,
+              'evento_nombre': event.name,
+              'fecha_inicio': _formatDate(event.startDate),
+              'fecha_fin': _formatDate(event.endDate),
+              'ubicacion': event.locationName ?? 'Por definir',
+              'admin_nombre': adminName ?? 'Supervisor',
+              'sede': event.sedeApp,
+            },
+          );
+        } catch (_) {
+          // No bloquear si falla una notificación individual
+        }
+      }
     }
   }
 

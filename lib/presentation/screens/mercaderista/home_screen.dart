@@ -9,6 +9,8 @@ import '../../../config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/route_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../notifications/notifications_drawer.dart';
 
 /// Pantalla principal del mercaderista
 class MercaderistaHomeScreen extends ConsumerStatefulWidget {
@@ -78,7 +80,10 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
     final userAsync = ref.watch(currentUserProvider);
     final todayRoutesAsync = ref.watch(todayRoutesProvider);
 
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+
     return Scaffold(
+      endDrawer: const NotificationsDrawer(),
       appBar: AppBar(
         title: Row(
           children: [
@@ -104,13 +109,17 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notificaciones próximamente')),
-              );
-            },
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: Badge(
+                isLabelVisible: (unreadCount.valueOrNull ?? 0) > 0,
+                label: Text('${unreadCount.valueOrNull ?? 0}'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              onPressed: () {
+                Scaffold.of(ctx).openEndDrawer();
+              },
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),

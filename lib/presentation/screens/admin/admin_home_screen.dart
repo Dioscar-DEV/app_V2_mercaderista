@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../notifications/notifications_drawer.dart';
 import '../../../core/models/user.dart';
 
 /// Stats del dashboard admin
@@ -82,16 +84,24 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
+      endDrawer: const NotificationsDrawer(),
       appBar: AppBar(
         title: const Text('Panel de Administración'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Implementar notificaciones
-            },
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: Badge(
+                isLabelVisible: (unreadCount.valueOrNull ?? 0) > 0,
+                label: Text('${unreadCount.valueOrNull ?? 0}'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              onPressed: () {
+                Scaffold.of(ctx).openEndDrawer();
+              },
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),

@@ -453,6 +453,7 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           routeTypeId: _selectedRouteTypeId,
           sedeApp: currentUser.sede?.value ?? 'grupo_disbattery',
           createdBy: currentUser.id,
+          adminName: currentUser.fullName,
         );
       } else {
         // Crear manualmente
@@ -470,7 +471,7 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           createdBy: currentUser.id,
         );
 
-        createdRoute = await repository.createRoute(route);
+        createdRoute = await repository.createRoute(route, adminName: currentUser.fullName);
 
         // Agregar clientes
         if (_selectedClientIds.isNotEmpty) {
