@@ -287,26 +287,23 @@ class ReportsRepository {
     final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
 
     // Clientes nunca visitados
-    var neverQuery = _client
+    var neverFilter = _client
         .from('clients')
         .select('co_cli, cli_des, sede_app, last_visit_at')
         .eq('inactivo', false)
-        .isFilter('last_visit_at', null)
-        .limit(limit);
-    if (sede != null) neverQuery = neverQuery.eq('sede_app', sede);
-    final List<dynamic> neverData = await neverQuery;
+        .isFilter('last_visit_at', null);
+    if (sede != null) neverFilter = neverFilter.eq('sede_app', sede);
+    final List<dynamic> neverData = await neverFilter.limit(limit);
 
     // Clientes con visita antigua
-    var oldQuery = _client
+    var oldFilter = _client
         .from('clients')
         .select('co_cli, cli_des, sede_app, last_visit_at')
         .eq('inactivo', false)
         .not('last_visit_at', 'is', null)
-        .lt('last_visit_at', cutoff)
-        .order('last_visit_at', ascending: true)
-        .limit(limit);
-    if (sede != null) oldQuery = oldQuery.eq('sede_app', sede);
-    final List<dynamic> oldData = await oldQuery;
+        .lt('last_visit_at', cutoff);
+    if (sede != null) oldFilter = oldFilter.eq('sede_app', sede);
+    final List<dynamic> oldData = await oldFilter.order('last_visit_at', ascending: true).limit(limit);
 
     final now = DateTime.now();
     final result = <UnvisitedClient>[];
@@ -400,15 +397,14 @@ class ReportsRepository {
     final fromStr = from.toIso8601String().split('T')[0];
     final toStr = to.toIso8601String().split('T')[0];
 
-    var query = _client
+    var queryFilter = _client
         .from('routes')
         .select('id, name, status, scheduled_date, total_clients, completed_clients, mercaderista_id, users(full_name), route_types(name, color)')
         .gte('scheduled_date', fromStr)
-        .lte('scheduled_date', toStr)
-        .order('scheduled_date', ascending: false);
-    if (sede != null) query = query.eq('sede_app', sede);
-    if (routeTypeId != null) query = query.eq('route_type_id', routeTypeId);
-    final List<dynamic> data = await query;
+        .lte('scheduled_date', toStr);
+    if (sede != null) queryFilter = queryFilter.eq('sede_app', sede);
+    if (routeTypeId != null) queryFilter = queryFilter.eq('route_type_id', routeTypeId);
+    final List<dynamic> data = await queryFilter.order('scheduled_date', ascending: false);
 
     return data.map((r) {
       final userData = r['users'] as Map<String, dynamic>?;
