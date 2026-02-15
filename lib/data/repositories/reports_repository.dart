@@ -399,7 +399,7 @@ class ReportsRepository {
 
     var queryFilter = _client
         .from('routes')
-        .select('id, name, status, scheduled_date, total_clients, completed_clients, mercaderista_id, users(full_name), route_types(name, color)')
+        .select('id, name, status, scheduled_date, total_clients, completed_clients, mercaderista_id, users!routes_mercaderista_id_fkey(full_name), route_types(name, color)')
         .gte('scheduled_date', fromStr)
         .lte('scheduled_date', toStr);
     if (sede != null) queryFilter = queryFilter.eq('sede_app', sede);
