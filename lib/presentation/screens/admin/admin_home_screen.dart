@@ -1,7 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/models/user.dart';
+
+/// Stats del dashboard admin
+class AdminStats {
+  final int routesToday;
+  final int completedToday;
+  final int activeMercaderistas;
+  final int totalClients;
+
+  const AdminStats({
+    this.routesToday = 0,
+    this.completedToday = 0,
+    this.activeMercaderistas = 0,
+    this.totalClients = 0,
+  });
+}
+
+/// Provider que carga las estadísticas del dashboard
+final adminStatsProvider = FutureProvider.family<AdminStats, AppUser>((ref, user) async {
+  final sb = Supabase.instance.client;
+  final today = DateTime.now().toIso8601String().split('T')[0];
+  final filterBySede = user.role.isSupervisor && user.sede != null;
+  final sede = user.sede?.value;
+
+  debugPrint('[AdminStats] user=${user.fullName}, role=${user.role.value}, sede=$sede, today=$today, filterBySede=$filterBySede');
+
+  try {
+    // 1. Rutas hoy
+    var rq = sb.from('routes').select('id').eq('scheduled_date', today);
+    if (filterBySede) rq = rq.eq('sede_app', sede!);
+    final List<dynamic> routesData = await rq;
+    debugPrint('[AdminStats] Rutas hoy: ${routesData.length}');
+
+    // 2. Completadas hoy
+    var cq = sb.from('routes').select('id').eq('scheduled_date', today).eq('status', 'completed');
+    if (filterBySede) cq = cq.eq('sede_app', sede!);
+    final List<dynamic> completedData = await cq;
+    debugPrint('[AdminStats] Completadas: ${completedData.length}');
+
+    // 3. Mercaderistas activos
+    var mq = sb.from('users').select('id').eq('role', 'mercaderista').eq('status', 'active');
+    if (filterBySede) mq = mq.eq('sede', sede!);
+    final List<dynamic> mercData = await mq;
+    debugPrint('[AdminStats] Mercaderistas: ${mercData.length}');
+
+    // 4. Total clientes (solo co_cli para minimizar data)
+    var clq = sb.from('clients').select('co_cli');
+    if (filterBySede) clq = clq.eq('sede_app', sede!);
+    final List<dynamic> clientsData = await clq;
+    debugPrint('[AdminStats] Clientes: ${clientsData.length}');
+
+    return AdminStats(
+      routesToday: routesData.length,
+      completedToday: completedData.length,
+      activeMercaderistas: mercData.length,
+      totalClients: clientsData.length,
+    );
+  } catch (e, stack) {
+    debugPrint('[AdminStats] ERROR: $e');
+    debugPrint('[AdminStats] STACK: $stack');
+    rethrow;
+  }
+});
 
 /// Pantalla principal del administrador
 class AdminHomeScreen extends ConsumerStatefulWidget {
@@ -120,49 +184,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.route,
-                        title: 'Rutas Hoy',
-                        value: '0',
-                        color: Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.check_circle,
-                        title: 'Completadas',
-                        value: '0',
-                        color: Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.people,
-                        title: 'Mercaderistas',
-                        value: '0',
-                        color: Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.store,
-                        title: 'Clientes',
-                        value: '0',
-                        color: Colors.purple,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildStatsSection(user),
                 const SizedBox(height: 24),
 
                 // Módulos de gestión
@@ -222,7 +244,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       subtitle: 'Trade eventos',
                       color: Colors.teal,
                       onTap: () {
-                        // TODO: Navegar a gestión de eventos
+                        context.push('/admin/events');
                       },
                     ),
                     _ModuleCard(
@@ -285,6 +307,102 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         context.go('/login');
       }
     }
+  }
+
+  /// Formatea números grandes: 2110 → "2.1K"
+  String _formatNumber(int n) {
+    if (n >= 1000) {
+      final k = n / 1000;
+      return k == k.truncateToDouble()
+          ? '${k.toInt()}K'
+          : '${k.toStringAsFixed(1)}K';
+    }
+    return n.toString();
+  }
+
+  Widget _buildStatsSection(AppUser user) {
+    final statsAsync = ref.watch(adminStatsProvider(user));
+
+    return statsAsync.when(
+      data: (stats) => Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.route,
+                  title: 'Rutas Hoy',
+                  value: stats.routesToday.toString(),
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.check_circle,
+                  title: 'Completadas',
+                  value: stats.completedToday.toString(),
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.people,
+                  title: 'Mercaderistas',
+                  value: stats.activeMercaderistas.toString(),
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.store,
+                  title: 'Clientes',
+                  value: _formatNumber(stats.totalClients),
+                  color: Colors.purple,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      loading: () => const SizedBox(
+        height: 160,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(icon: Icons.route, title: 'Rutas Hoy', value: '-', color: Colors.blue),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(icon: Icons.check_circle, title: 'Completadas', value: '-', color: Colors.green),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(icon: Icons.people, title: 'Mercaderistas', value: '-', color: Colors.orange),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(icon: Icons.store, title: 'Clientes', value: '-', color: Colors.purple),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

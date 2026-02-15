@@ -396,6 +396,17 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
       );
       _updateClientInRoute(updatedClient);
 
+      // Actualizar cliente: coordenadas GPS + last_visit_at (offline-first)
+      try {
+        await _offlineRepository.updateClientAfterVisit(
+          clientCoCli: currentClient.clientId,
+          latitude: latitude,
+          longitude: longitude,
+        );
+      } catch (_) {
+        // Silencioso - no bloquear el flujo por esto
+      }
+
       // Construir la visita con campos correctos para Supabase
       final visit = RouteVisit(
         id: '',

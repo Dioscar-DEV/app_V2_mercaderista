@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/supabase_config.dart';
 import '../../core/models/user.dart';
@@ -6,34 +8,54 @@ import '../../core/models/user.dart';
 class AuthRepository {
   final SupabaseClient _client = SupabaseConfig.client;
 
+  /// Verifica si un error es de red (DNS, socket, conexión)
+  bool _isNetworkError(Object e) {
+    return e is SocketException || e.toString().contains('SocketException');
+  }
+
   /// Inicia sesión con email y contraseña
+  /// Incluye retry automático para manejar DNS no disponible en primer arranque
   Future<AppUser> signInWithEmail({
     required String email,
     required String password,
   }) async {
-    try {
-      final response = await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+    const maxRetries = 2;
 
-      if (response.user == null) {
-        throw Exception('Error al iniciar sesión');
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        final response = await _client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+
+        if (response.user == null) {
+          throw Exception('Error al iniciar sesión');
+        }
+
+        // Obtener datos del usuario desde la tabla users
+        final userData = await _client
+            .from('users')
+            .select()
+            .eq('id', response.user!.id)
+            .single();
+
+        return AppUser.fromJson(userData);
+      } on AuthException catch (e) {
+        throw _handleAuthException(e);
+      } catch (e) {
+        if (_isNetworkError(e) && attempt < maxRetries) {
+          debugPrint('[Auth] Error de red intento ${attempt + 1}/$maxRetries: $e');
+          await Future.delayed(Duration(milliseconds: 800 * (attempt + 1)));
+          continue;
+        }
+        if (_isNetworkError(e)) {
+          throw Exception('Sin conexión a internet. Verifica tu red e intenta de nuevo.');
+        }
+        throw Exception('Error al iniciar sesión: $e');
       }
-
-      // Obtener datos del usuario desde la tabla users
-      final userData = await _client
-          .from('users')
-          .select()
-          .eq('id', response.user!.id)
-          .single();
-
-      return AppUser.fromJson(userData);
-    } on AuthException catch (e) {
-      throw _handleAuthException(e);
-    } catch (e) {
-      throw Exception('Error al iniciar sesión: $e');
     }
+
+    throw Exception('No se pudo conectar al servidor. Intenta de nuevo.');
   }
 
   /// Registra un nuevo usuario

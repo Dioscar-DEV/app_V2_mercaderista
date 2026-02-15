@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/models/route.dart';
 import '../../../core/models/route_visit.dart';
 import '../../../core/models/route_template.dart';
@@ -474,6 +475,28 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
               ),
           ],
 
+          // Open in Maps button (only if coordinates exist)
+          if (_getClientCoordinates(routeClient) != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final coords = _getClientCoordinates(routeClient)!;
+                    _openInMaps(coords.$1, coords.$2);
+                  },
+                  icon: const Icon(Icons.map, size: 18),
+                  label: const Text('Abrir en Mapa'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue[700],
+                    side: BorderSide(color: Colors.blue[300]!),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ),
+
           // Action area based on status and role
           if (!isMercaderista) ...[
             _buildReadOnlyStatus(routeClient),
@@ -779,6 +802,35 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         return 'Omitida';
       case RouteClientStatus.closedTemp:
         return 'Cerrado';
+    }
+  }
+
+  // --- Maps ---
+
+  /// Returns (lat, lng) from the client record (tabla clients).
+  /// These are saved when a visit is completed with valid GPS.
+  (double, double)? _getClientCoordinates(RouteClient routeClient) {
+    final client = routeClient.client;
+    if (client != null &&
+        client.latitude != null &&
+        client.longitude != null &&
+        client.latitude != 0.0 &&
+        client.longitude != 0.0) {
+      return (client.latitude!, client.longitude!);
+    }
+    return null;
+  }
+
+  Future<void> _openInMaps(double lat, double lng) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo abrir Google Maps')),
+      );
     }
   }
 

@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/models/route.dart';
 import '../../core/models/route_form_question.dart';
+import '../../core/models/event_check_in.dart';
 import '../../core/models/user.dart';
 import '../../core/enums/route_status.dart';
 import '../local/database_service.dart';
+import 'event_repository.dart';
 import 'route_repository.dart';
 
 /// Repositorio que implementa patrón Offline-First
@@ -349,6 +351,43 @@ class OfflineFirstRouteRepository {
     }
   }
 
+  /// Actualiza coordenadas GPS y last_visit_at en tabla clients - funciona offline
+  Future<void> updateClientAfterVisit({
+    required String clientCoCli,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final data = {
+      'client_co_cli': clientCoCli,
+      'latitude': latitude,
+      'longitude': longitude,
+      'last_visit_at': DateTime.now().toIso8601String(),
+    };
+
+    if (_isOnline) {
+      try {
+        await _remoteRepository.updateClientAfterVisit(
+          clientCoCli: clientCoCli,
+          latitude: latitude,
+          longitude: longitude,
+        );
+        return;
+      } on SocketException catch (_) {
+        _isOnline = false;
+      } catch (_) {
+        // Guardar para sync posterior
+      }
+    }
+
+    // Offline o falló: guardar como pendiente
+    await _localDb.savePendingSync(
+      tableName: 'clients',
+      recordId: clientCoCli,
+      operation: 'client_update',
+      data: data,
+    );
+  }
+
   // ========================
   // SINCRONIZACIÓN
   // ========================
@@ -426,6 +465,45 @@ class OfflineFirstRouteRepository {
               break;
             case 'complete_route':
               await _remoteRepository.completeRoute(recordId);
+              break;
+            case 'client_update':
+              final data = jsonDecode(op['data_json'] as String) as Map<String, dynamic>;
+              await _remoteRepository.updateClientAfterVisit(
+                clientCoCli: data['client_co_cli'] as String,
+                latitude: (data['latitude'] as num).toDouble(),
+                longitude: (data['longitude'] as num).toDouble(),
+              );
+              break;
+            case 'event_check_in':
+              final data = jsonDecode(op['data_json'] as String) as Map<String, dynamic>;
+              final eventRepo = EventRepository();
+              final checkIn = EventCheckIn(
+                id: '',
+                eventId: data['event_id'] as String,
+                mercaderistaId: data['mercaderista_id'] as String,
+                checkInDate: DateTime.parse(data['check_in_date'] as String),
+                startedAt: data['started_at'] != null ? DateTime.parse(data['started_at'] as String) : null,
+                completedAt: data['completed_at'] != null ? DateTime.parse(data['completed_at'] as String) : null,
+                latitude: (data['latitude'] as num?)?.toDouble(),
+                longitude: (data['longitude'] as num?)?.toDouble(),
+                observations: data['observations'] as String?,
+                createdAt: DateTime.now(),
+              );
+              final created = await eventRepo.createCheckIn(checkIn);
+              if (data['answers'] != null) {
+                final answers = (data['answers'] as List).map((a) {
+                  final m = a as Map<String, dynamic>;
+                  return EventCheckInAnswer(
+                    id: '',
+                    checkInId: created.id,
+                    questionId: m['question_id'] as String,
+                    answer: m['answer'] as String?,
+                    photoUrl: m['photo_url'] as String?,
+                    createdAt: DateTime.now(),
+                  );
+                }).toList();
+                await eventRepo.saveCheckInAnswers(answers);
+              }
               break;
           }
           

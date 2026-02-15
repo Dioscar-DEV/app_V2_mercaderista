@@ -400,6 +400,25 @@ class RouteRepository {
     return RouteClient.fromJson(response);
   }
 
+  /// Actualiza coordenadas GPS, last_visit_at y visit_count en tabla clients
+  Future<void> updateClientAfterVisit({
+    required String clientCoCli,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final updateData = <String, dynamic>{
+      'last_visit_at': DateTime.now().toIso8601String(),
+    };
+
+    // Solo guardar coordenadas si son válidas
+    if (latitude != 0.0 && longitude != 0.0) {
+      updateData['latitude'] = latitude;
+      updateData['longitude'] = longitude;
+    }
+
+    await _client.from('clients').update(updateData).eq('co_cli', clientCoCli);
+  }
+
   /// Marca un cliente como cerrado permanentemente
   Future<void> markClientPermanentlyClosed({
     required String clientCoCli,

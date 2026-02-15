@@ -13,6 +13,10 @@ import '../presentation/screens/clients/client_detail_screen.dart';
 import '../presentation/screens/routes/route_calendar_screen.dart';
 import '../presentation/screens/routes/create_edit_route_screen.dart';
 import '../presentation/screens/routes/route_execution_screen.dart';
+import '../presentation/screens/admin/events/event_list_screen.dart';
+import '../presentation/screens/admin/events/create_edit_event_screen.dart';
+import '../presentation/screens/admin/events/event_detail_screen.dart';
+import '../presentation/screens/events/event_check_in_screen.dart';
 
 /// Configuración de rutas de la aplicación
 class AppRouter {
@@ -112,6 +116,33 @@ class AppRouter {
               return CreateEditRouteScreen(routeId: routeId);
             },
           ),
+          // Gestión de eventos
+          GoRoute(
+            path: 'events',
+            name: 'events_list',
+            builder: (context, state) => const EventListScreen(),
+          ),
+          GoRoute(
+            path: 'events/create',
+            name: 'create_event',
+            builder: (context, state) => const CreateEditEventScreen(),
+          ),
+          GoRoute(
+            path: 'events/:id',
+            name: 'event_detail',
+            builder: (context, state) {
+              final eventId = state.pathParameters['id']!;
+              return EventDetailScreen(eventId: eventId);
+            },
+          ),
+          GoRoute(
+            path: 'events/:id/edit',
+            name: 'edit_event',
+            builder: (context, state) {
+              final eventId = state.pathParameters['id']!;
+              return CreateEditEventScreen(eventId: eventId);
+            },
+          ),
         ],
       ),
 
@@ -122,6 +153,14 @@ class AppRouter {
         builder: (context, state) {
           final routeId = state.pathParameters['id']!;
           return RouteExecutionScreen(routeId: routeId);
+        },
+      ),
+      GoRoute(
+        path: '/mercaderista/event/:id',
+        name: 'mercaderista_event',
+        builder: (context, state) {
+          final eventId = state.pathParameters['id']!;
+          return EventCheckInScreen(eventId: eventId);
         },
       ),
 

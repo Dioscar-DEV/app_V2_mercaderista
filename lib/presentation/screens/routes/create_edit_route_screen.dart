@@ -654,6 +654,7 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
   late List<String> _selected;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _visitFilter = 'todos'; // todos, esta_semana, este_mes, sin_visita_90, nunca
 
   @override
   void initState() {
@@ -667,14 +668,52 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
     super.dispose();
   }
 
+  bool _matchesVisitFilter(Client c) {
+    switch (_visitFilter) {
+      case 'esta_semana':
+        return c.lastVisitAt == null || c.diasDesdeUltimaVisita! > 7;
+      case 'este_mes':
+        return c.lastVisitAt == null || c.diasDesdeUltimaVisita! > 30;
+      case 'sin_visita_90':
+        return c.lastVisitAt == null || c.diasDesdeUltimaVisita! > 90;
+      case 'nunca':
+        return c.lastVisitAt == null;
+      default:
+        return true;
+    }
+  }
+
+  String _formatLastVisit(Client c) {
+    if (c.lastVisitAt == null) return 'Nunca visitado';
+    final dias = c.diasDesdeUltimaVisita!;
+    if (dias == 0) return 'Hoy';
+    if (dias == 1) return 'Ayer';
+    return 'Hace $dias días';
+  }
+
+  Color _getVisitColor(Client c) {
+    if (c.lastVisitAt == null) return Colors.grey;
+    final dias = c.diasDesdeUltimaVisita!;
+    if (dias <= 7) return Colors.green;
+    if (dias <= 30) return Colors.orange;
+    return Colors.red;
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredClients = widget.availableClients.where((c) {
-      if (_searchQuery.isEmpty) return true;
-      final query = _searchQuery.toLowerCase();
-      return c.cliDes.toLowerCase().contains(query) ||
-          (c.direc1?.toLowerCase().contains(query) ?? false) ||
-          c.coCli.toLowerCase().contains(query);
+      // Filtro de búsqueda
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchesSearch = c.cliDes.toLowerCase().contains(query) ||
+            (c.direc1?.toLowerCase().contains(query) ?? false) ||
+            c.coCli.toLowerCase().contains(query) ||
+            (c.rif?.toLowerCase().contains(query) ?? false) ||
+            (c.ciudad?.toLowerCase().contains(query) ?? false);
+        if (!matchesSearch) return false;
+      }
+      // Filtro de última visita
+      return _matchesVisitFilter(c);
     }).toList();
 
     return DraggableScrollableSheet(
@@ -725,7 +764,7 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
                     TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Buscar cliente...',
+                        hintText: 'Buscar por nombre, RIF, ciudad...',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -734,6 +773,42 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
                         fillColor: Colors.grey[100],
                       ),
                       onChanged: (value) => setState(() => _searchQuery = value),
+                    ),
+                    const SizedBox(height: 10),
+                    // Filtros de última visita
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterChip('todos', 'Todos'),
+                          const SizedBox(width: 6),
+                          _buildFilterChip('esta_semana', 'Sin visita +7d'),
+                          const SizedBox(width: 6),
+                          _buildFilterChip('este_mes', 'Sin visita +30d'),
+                          const SizedBox(width: 6),
+                          _buildFilterChip('sin_visita_90', 'Sin visita +90d'),
+                          const SizedBox(width: 6),
+                          _buildFilterChip('nunca', 'Nunca visitado'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Conteo de resultados
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                color: Colors.grey[50],
+                child: Row(
+                  children: [
+                    Text(
+                      '${filteredClients.length} clientes',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_selected.length} seleccionados',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).primaryColor),
                     ),
                   ],
                 ),
@@ -766,8 +841,34 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
                           color: isSelected ? Colors.white : Colors.grey,
                         ),
                       ),
-                      title: Text(client.cliDes),
-                      subtitle: Text(client.direc1 ?? ''),
+                      title: Text(client.cliDes, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              client.direc1 ?? client.ciudad ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: _getVisitColor(client).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _formatLastVisit(client),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _getVisitColor(client),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       activeColor: ThemeConfig.primaryColor,
                     );
                   },
@@ -777,6 +878,19 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterChip(String value, String label) {
+    final isActive = _visitFilter == value;
+    return FilterChip(
+      label: Text(label, style: TextStyle(fontSize: 11, color: isActive ? Colors.white : null)),
+      selected: isActive,
+      onSelected: (_) => setState(() => _visitFilter = value),
+      selectedColor: Theme.of(context).primaryColor,
+      checkmarkColor: Colors.white,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
     );
   }
 }

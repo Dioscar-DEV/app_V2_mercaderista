@@ -30,7 +30,7 @@ class DatabaseService {
     
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -139,6 +139,59 @@ class DatabaseService {
       )
     ''');
 
+    // Tabla de eventos
+    await db.execute('''
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        route_type_id TEXT,
+        location_name TEXT,
+        latitude REAL,
+        longitude REAL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'planned',
+        notes TEXT,
+        sede_app TEXT NOT NULL,
+        created_by TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        is_synced INTEGER DEFAULT 1
+      )
+    ''');
+
+    // Tabla de mercaderistas asignados a eventos
+    await db.execute('''
+      CREATE TABLE event_mercaderistas (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        mercaderista_id TEXT NOT NULL,
+        mercaderista_name TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Tabla de check-ins de eventos
+    await db.execute('''
+      CREATE TABLE event_check_ins (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        mercaderista_id TEXT NOT NULL,
+        check_in_date TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        latitude REAL,
+        longitude REAL,
+        observations TEXT,
+        answers_json TEXT,
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 1,
+        FOREIGN KEY (event_id) REFERENCES events(id)
+      )
+    ''');
+
     // Índices para mejorar performance
     await db.execute('CREATE INDEX idx_routes_mercaderista ON routes(mercaderista_id)');
     await db.execute('CREATE INDEX idx_routes_date ON routes(scheduled_date)');
@@ -146,6 +199,9 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_pending_visits_synced ON pending_visits(is_synced)');
     await db.execute('CREATE INDEX idx_pending_sync_table ON pending_sync(table_name)');
     await db.execute('CREATE INDEX idx_questions_route_type ON route_form_questions(route_type_id)');
+    await db.execute('CREATE INDEX idx_events_date ON events(start_date)');
+    await db.execute('CREATE INDEX idx_event_merc_event ON event_mercaderistas(event_id)');
+    await db.execute('CREATE INDEX idx_event_checkin_event ON event_check_ins(event_id)');
   }
 
   Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
@@ -170,6 +226,60 @@ class DatabaseService {
     // Migración de v2 a v3: Agregar closure_reason a route_clients
     if (oldVersion < 3) {
       await db.execute('ALTER TABLE route_clients ADD COLUMN closure_reason TEXT');
+    }
+
+    // Migración de v3 a v4: Tablas de eventos
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS events (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          route_type_id TEXT,
+          location_name TEXT,
+          latitude REAL,
+          longitude REAL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'planned',
+          notes TEXT,
+          sede_app TEXT NOT NULL,
+          created_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
+          is_synced INTEGER DEFAULT 1
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS event_mercaderistas (
+          id TEXT PRIMARY KEY,
+          event_id TEXT NOT NULL,
+          mercaderista_id TEXT NOT NULL,
+          mercaderista_name TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS event_check_ins (
+          id TEXT PRIMARY KEY,
+          event_id TEXT NOT NULL,
+          mercaderista_id TEXT NOT NULL,
+          check_in_date TEXT NOT NULL,
+          started_at TEXT,
+          completed_at TEXT,
+          latitude REAL,
+          longitude REAL,
+          observations TEXT,
+          answers_json TEXT,
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 1,
+          FOREIGN KEY (event_id) REFERENCES events(id)
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_events_date ON events(start_date)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_event_merc_event ON event_mercaderistas(event_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_event_checkin_event ON event_check_ins(event_id)');
     }
   }
 
@@ -532,6 +642,9 @@ class DatabaseService {
     final db = await database;
     await db.delete('pending_sync');
     await db.delete('pending_visits');
+    await db.delete('event_check_ins');
+    await db.delete('event_mercaderistas');
+    await db.delete('events');
     await db.delete('route_clients');
     await db.delete('routes');
   }
@@ -614,11 +727,118 @@ class DatabaseService {
   Future<bool> hasQuestionsForRouteType(String routeTypeId) async {
     final db = await database;
     final result = await db.rawQuery('''
-      SELECT COUNT(*) as count FROM route_form_questions 
+      SELECT COUNT(*) as count FROM route_form_questions
       WHERE route_type_id = ? AND is_active = 1
     ''', [routeTypeId]);
     return (result.first['count'] as int) > 0;
   }
 
+  // ========================
+  // OPERACIONES DE EVENTOS
+  // ========================
+
+  /// Guarda un evento localmente
+  Future<void> saveEvent(Map<String, dynamic> eventJson) async {
+    final db = await database;
+    await db.insert(
+      'events',
+      {
+        'id': eventJson['id'],
+        'name': eventJson['name'],
+        'description': eventJson['description'],
+        'route_type_id': eventJson['route_type_id'],
+        'location_name': eventJson['location_name'],
+        'latitude': eventJson['latitude'],
+        'longitude': eventJson['longitude'],
+        'start_date': eventJson['start_date'],
+        'end_date': eventJson['end_date'],
+        'status': eventJson['status'] ?? 'planned',
+        'notes': eventJson['notes'],
+        'sede_app': eventJson['sede_app'],
+        'created_by': eventJson['created_by'],
+        'created_at': eventJson['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_at': eventJson['updated_at'],
+        'is_synced': 1,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Guarda un mercaderista asignado a un evento
+  Future<void> saveEventMercaderista(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.insert(
+      'event_mercaderistas',
+      {
+        'id': json['id'],
+        'event_id': json['event_id'],
+        'mercaderista_id': json['mercaderista_id'],
+        'mercaderista_name': json['mercaderista_name'],
+        'created_at': json['created_at'] ?? DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Obtiene eventos para un mercaderista en una fecha
+  Future<List<Map<String, dynamic>>> getEventsForDate(
+      String mercaderistaId, String date) async {
+    final db = await database;
+    final events = await db.rawQuery('''
+      SELECT e.* FROM events e
+      INNER JOIN event_mercaderistas em ON em.event_id = e.id
+      WHERE em.mercaderista_id = ?
+        AND e.start_date <= ?
+        AND e.end_date >= ?
+        AND e.status != 'cancelled'
+      ORDER BY e.start_date ASC
+    ''', [mercaderistaId, date, date]);
+    return events;
+  }
+
+  /// Obtiene mercaderistas de un evento
+  Future<List<Map<String, dynamic>>> getEventMercaderistas(String eventId) async {
+    final db = await database;
+    return db.query(
+      'event_mercaderistas',
+      where: 'event_id = ?',
+      whereArgs: [eventId],
+    );
+  }
+
+  /// Guarda un check-in de evento localmente
+  Future<void> saveEventCheckIn(Map<String, dynamic> checkInJson) async {
+    final db = await database;
+    await db.insert(
+      'event_check_ins',
+      {
+        'id': checkInJson['id'],
+        'event_id': checkInJson['event_id'],
+        'mercaderista_id': checkInJson['mercaderista_id'],
+        'check_in_date': checkInJson['check_in_date'],
+        'started_at': checkInJson['started_at'],
+        'completed_at': checkInJson['completed_at'],
+        'latitude': checkInJson['latitude'],
+        'longitude': checkInJson['longitude'],
+        'observations': checkInJson['observations'],
+        'answers_json': checkInJson['answers_json'],
+        'created_at': checkInJson['created_at'] ?? DateTime.now().toIso8601String(),
+        'is_synced': checkInJson['is_synced'] ?? 1,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Obtiene check-ins de un evento para un mercaderista
+  Future<List<Map<String, dynamic>>> getEventCheckIns(
+      String eventId, String mercaderistaId) async {
+    final db = await database;
+    return db.query(
+      'event_check_ins',
+      where: 'event_id = ? AND mercaderista_id = ?',
+      whereArgs: [eventId, mercaderistaId],
+      orderBy: 'check_in_date DESC',
+    );
+  }
 }
 

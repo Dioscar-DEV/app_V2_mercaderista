@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../core/models/route.dart';
+import '../../../core/models/event.dart';
 import '../../../core/enums/route_status.dart';
 import '../../../config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/route_provider.dart';
+import '../../providers/event_provider.dart';
 
 /// Pantalla principal del mercaderista
 class MercaderistaHomeScreen extends ConsumerStatefulWidget {
@@ -242,6 +244,11 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
                     },
                   ),
                   
+                  const SizedBox(height: 20),
+
+                  // Eventos del día
+                  _buildEventsSection(context, ref),
+
                   const SizedBox(height: 20),
 
                   // Pendientes de ayer
@@ -598,6 +605,148 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventsSection(BuildContext context, WidgetRef ref) {
+    final eventsAsync = ref.watch(mercaderistaEventsProvider);
+
+    return eventsAsync.when(
+      data: (events) {
+        if (events.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Eventos del Día',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            ...events.map((event) => _buildEventCard(context, event)),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildEventCard(BuildContext context, AppEvent event) {
+    final currentDay = event.currentDay;
+    final checkInAsync = ref.watch(eventTodayCheckInProvider(event.id));
+    final hasCheckedIn = checkInAsync.valueOrNull ?? false;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => context.push('/mercaderista/event/${event.id}'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: hasCheckedIn
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : Colors.teal.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      hasCheckedIn ? Icons.check_circle : Icons.event,
+                      color: hasCheckedIn ? Colors.green : Colors.teal,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.name,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (event.locationName != null)
+                          Text(
+                            event.locationName!,
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (currentDay != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Día $currentDay/${event.totalDays}',
+                        style: const TextStyle(
+                          color: Colors.teal,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (hasCheckedIn)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        'Check-in completado hoy',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        context.push('/mercaderista/event/${event.id}'),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Hacer Check-in'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
