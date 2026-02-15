@@ -102,22 +102,11 @@ class _LoginScreenNewState extends ConsumerState<LoginScreenNew> {
                             width: 280,
                             fit: BoxFit.contain,
                           ),
-                          const SizedBox(height: 30),
-
-                          // Título
-                          const Text(
-                            'Disbattery Mercaderista',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 20),
 
                           // Subtítulo
                           Text(
-                            'por favor inicie sesion para continuar',
+                            'Inicie sesión para continuar',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
