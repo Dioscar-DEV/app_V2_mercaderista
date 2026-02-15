@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/models/route.dart';
+import '../../core/models/route_type.dart';
 import '../../core/models/client.dart';
 import '../../core/models/route_visit.dart';
 import '../../core/models/route_form_question.dart';
@@ -30,7 +31,7 @@ class DatabaseService {
     
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -135,7 +136,11 @@ class DatabaseService {
         is_required INTEGER DEFAULT 0,
         display_order INTEGER DEFAULT 0,
         is_active INTEGER DEFAULT 1,
-        created_at TEXT
+        created_at TEXT,
+        section TEXT,
+        depends_on TEXT,
+        depends_value TEXT,
+        metadata_json TEXT
       )
     ''');
 
@@ -281,6 +286,16 @@ class DatabaseService {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_event_merc_event ON event_mercaderistas(event_id)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_event_checkin_event ON event_check_ins(event_id)');
     }
+
+    // Migración de v4 a v5: Columnas para secciones y condicionales en preguntas
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE route_form_questions ADD COLUMN section TEXT');
+      await db.execute('ALTER TABLE route_form_questions ADD COLUMN depends_on TEXT');
+      await db.execute('ALTER TABLE route_form_questions ADD COLUMN depends_value TEXT');
+      await db.execute('ALTER TABLE route_form_questions ADD COLUMN metadata_json TEXT');
+      // Forzar re-descarga de preguntas actualizadas
+      await db.execute('DELETE FROM route_form_questions');
+    }
   }
 
   // ========================
@@ -407,6 +422,18 @@ class DatabaseService {
   }
 
   AppRoute _mapToRoute(Map<String, dynamic> map, List<RouteClient> clients) {
+    // Reconstruir RouteType desde campos cached en SQLite
+    RouteType? routeType;
+    final routeTypeId = map['route_type_id'] as String?;
+    final routeTypeName = map['route_type_name'] as String?;
+    if (routeTypeId != null && routeTypeName != null) {
+      routeType = RouteType(
+        id: routeTypeId,
+        name: routeTypeName,
+        color: (map['route_type_color'] as String?) ?? '#2196F3',
+      );
+    }
+
     return AppRoute(
       id: map['id'] as String,
       mercaderistaId: map['mercaderista_id'] as String,
@@ -415,21 +442,22 @@ class DatabaseService {
       status: RouteStatus.fromString(map['status'] as String),
       totalClients: map['total_clients'] as int? ?? 0,
       completedClients: map['completed_clients'] as int? ?? 0,
-      estimatedDuration: map['estimated_duration'] != null 
+      estimatedDuration: map['estimated_duration'] != null
           ? _parseDuration(map['estimated_duration'] as String)
           : null,
-      startedAt: map['started_at'] != null 
+      startedAt: map['started_at'] != null
           ? DateTime.parse(map['started_at'] as String)
           : null,
-      completedAt: map['completed_at'] != null 
+      completedAt: map['completed_at'] != null
           ? DateTime.parse(map['completed_at'] as String)
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: map['updated_at'] != null 
+      updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
           : null,
       templateId: map['template_id'] as String?,
-      routeTypeId: map['route_type_id'] as String?,
+      routeTypeId: routeTypeId,
+      routeType: routeType,
       notes: map['notes'] as String?,
       sedeApp: map['sede_app'] as String,
       createdBy: map['created_by'] as String?,
@@ -668,8 +696,13 @@ class DatabaseService {
   /// Guarda preguntas del formulario para un tipo de ruta
   Future<void> saveFormQuestions(List<RouteFormQuestion> questions) async {
     final db = await database;
-    
+
     for (final question in questions) {
+      String? metadataStr;
+      if (question.metadata != null && question.metadata!.isNotEmpty) {
+        metadataStr = jsonEncode(question.metadata);
+      }
+
       await db.insert(
         'route_form_questions',
         {
@@ -682,6 +715,10 @@ class DatabaseService {
           'display_order': question.displayOrder,
           'is_active': question.isActive ? 1 : 0,
           'created_at': question.createdAt?.toIso8601String(),
+          'section': question.section,
+          'depends_on': question.dependsOn,
+          'depends_value': question.dependsValue,
+          'metadata_json': metadataStr,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -691,7 +728,7 @@ class DatabaseService {
   /// Obtiene preguntas del formulario por tipo de ruta
   Future<List<RouteFormQuestion>> getFormQuestionsByRouteType(String routeTypeId) async {
     final db = await database;
-    
+
     final questionMaps = await db.query(
       'route_form_questions',
       where: 'route_type_id = ? AND is_active = 1',
@@ -706,6 +743,17 @@ class DatabaseService {
         options = optionsStr.split('|||');
       }
 
+      // Parsear metadata_json
+      Map<String, dynamic>? metadata;
+      final metadataStr = map['metadata_json'] as String?;
+      if (metadataStr != null && metadataStr.isNotEmpty) {
+        try {
+          metadata = Map<String, dynamic>.from(jsonDecode(metadataStr) as Map);
+        } catch (_) {
+          metadata = null;
+        }
+      }
+
       return RouteFormQuestion(
         id: map['id'] as String,
         routeTypeId: map['route_type_id'] as String,
@@ -715,9 +763,13 @@ class DatabaseService {
         isRequired: (map['is_required'] as int) == 1,
         displayOrder: map['display_order'] as int? ?? 0,
         isActive: (map['is_active'] as int) == 1,
-        createdAt: map['created_at'] != null 
+        createdAt: map['created_at'] != null
             ? DateTime.parse(map['created_at'] as String)
             : null,
+        section: map['section'] as String?,
+        dependsOn: map['depends_on'] as String?,
+        dependsValue: map['depends_value'] as String?,
+        metadata: metadata,
       );
     }).toList();
   }

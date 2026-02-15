@@ -9,7 +9,7 @@ import '../../../core/models/route_form_question.dart';
 import '../../../core/models/route_visit.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
-import '../../widgets/route_visit_form.dart';
+import '../../widgets/evento_visit_form.dart';
 
 /// Pantalla de check-in de evento para mercaderista
 class EventCheckInScreen extends ConsumerStatefulWidget {
@@ -226,39 +226,38 @@ class _EventCheckInScreenState extends ConsumerState<EventCheckInScreen> {
               ),
             ] else ...[
               // Formulario de check-in
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Realizar Check-in',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              if (_questions.isNotEmpty)
+                // EventoVisitForm ya incluye su propio Card/header
+                EventoVisitForm(
+                  questions: _questions,
+                  onComplete: (answers, photoUrls, observations) {
+                    _submitCheckIn(
+                      answers: answers,
+                      observations: observations,
+                    );
+                  },
+                )
+              else
+                // Solo botón de check-in sin formulario
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Realizar Check-in',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Al hacer check-in se capturará tu ubicación GPS actual.',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Si hay formulario, mostrar RouteVisitForm
-                      if (_questions.isNotEmpty)
-                        RouteVisitForm(
-                          questions: _questions,
-                          onComplete: (answers, photoUrls, observations) {
-                            _submitCheckIn(
-                              answers: answers,
-                              observations: observations,
-                            );
-                          },
-                        )
-                      else
-                        // Solo botón de check-in sin formulario
+                        const SizedBox(height: 8),
+                        Text(
+                          'Al hacer check-in se capturará tu ubicación GPS actual.',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                        ),
+                        const SizedBox(height: 16),
                         _SimpleCheckInForm(
                           onSubmit: (observations) {
                             _submitCheckIn(
@@ -267,10 +266,10 @@ class _EventCheckInScreenState extends ConsumerState<EventCheckInScreen> {
                             );
                           },
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ],
         ),

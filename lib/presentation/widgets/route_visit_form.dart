@@ -391,6 +391,13 @@ class _RouteVisitFormState extends ConsumerState<RouteVisitForm> {
             _answers[question.id] != null ? 'Foto tomada ✓' : 'Tomar foto',
           ),
         );
+
+      // Nuevos tipos se manejan en MerchandisingVisitForm
+      default:
+        return TextFormField(
+          decoration: const InputDecoration(hintText: 'Escribe tu respuesta...'),
+          onChanged: (value) => _answers[question.id] = value,
+        );
     }
   }
 

@@ -11,6 +11,9 @@ import '../../../data/services/location_service.dart';
 import '../../providers/route_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/route_visit_form.dart';
+import '../../widgets/merchandising_visit_form.dart';
+import '../../widgets/impulso_visit_form.dart';
+import '../../widgets/evento_visit_form.dart';
 
 /// Pantalla de ejecución de ruta para mercaderista
 /// Diseñada para funcionar offline una vez cargada
@@ -252,6 +255,27 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         children: [
           Row(
             children: [
+              // Badge del tipo de ruta
+              if (route.routeType != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _parseRouteTypeColor(route.routeType!.color).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _parseRouteTypeColor(route.routeType!.color).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Text(
+                    route.routeType!.name,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _parseRouteTypeColor(route.routeType!.color),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: Row(
                   children: [
@@ -294,6 +318,15 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         ],
       ),
     );
+  }
+
+  Color _parseRouteTypeColor(String hexColor) {
+    try {
+      final hex = hexColor.replaceFirst('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      return ThemeConfig.primaryColor;
+    }
   }
 
   Widget _buildMiniStat(IconData icon, Color color, String count) {
@@ -587,12 +620,35 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
       RouteClient routeClient, RouteExecutionState state) {
     return Column(
       children: [
-        RouteVisitForm(
-          questions: state.questions,
-          onComplete: (answers, photoUrls, observations) {
-            _completeVisit(routeClient, answers, photoUrls, observations);
-          },
-        ),
+        // Formulario según tipo de ruta
+        if (state.route?.routeType?.name == 'Merchandising')
+          MerchandisingVisitForm(
+            questions: state.questions,
+            onComplete: (answers, photoUrls, observations) {
+              _completeVisit(routeClient, answers, photoUrls, observations);
+            },
+          )
+        else if (state.route?.routeType?.name == 'Impulso')
+          ImpulsoVisitForm(
+            questions: state.questions,
+            onComplete: (answers, photoUrls, observations) {
+              _completeVisit(routeClient, answers, photoUrls, observations);
+            },
+          )
+        else if (state.route?.routeType?.name == 'Evento')
+          EventoVisitForm(
+            questions: state.questions,
+            onComplete: (answers, photoUrls, observations) {
+              _completeVisit(routeClient, answers, photoUrls, observations);
+            },
+          )
+        else
+          RouteVisitForm(
+            questions: state.questions,
+            onComplete: (answers, photoUrls, observations) {
+              _completeVisit(routeClient, answers, photoUrls, observations);
+            },
+          ),
         const SizedBox(height: 8),
         Row(
           children: [
