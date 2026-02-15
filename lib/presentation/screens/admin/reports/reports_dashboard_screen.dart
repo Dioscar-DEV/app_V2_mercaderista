@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../providers/reports_provider.dart';
 import '../../../../core/models/report_models.dart';
+import '../../../../core/enums/sede.dart';
 
 /// Pantalla principal del módulo de reportes con KPIs, gráficas y acceso rápido.
 class ReportsDashboardScreen extends ConsumerStatefulWidget {
@@ -34,17 +35,24 @@ class _ReportsDashboardScreenState
   ];
 
   ReportsFilter _filterFromIndex(int index) {
+    final currentSede = ref.read(reportsFilterProvider).sede;
+    ReportsFilter base;
     switch (index) {
       case 0:
-        return ReportsFilter.today();
+        base = ReportsFilter.today();
+        break;
       case 1:
-        return ReportsFilter.last7Days();
+        base = ReportsFilter.last7Days();
+        break;
       case 2:
-        return ReportsFilter.last30Days();
+        base = ReportsFilter.last30Days();
+        break;
       case 3:
       default:
-        return ReportsFilter.thisMonth();
+        base = ReportsFilter.thisMonth();
+        break;
     }
+    return base.copyWith(sede: currentSede);
   }
 
   int _selectedFilterIndex() {
@@ -61,6 +69,9 @@ class _ReportsDashboardScreenState
     final breakdownAsync = ref.watch(routeBreakdownProvider);
     final selectedIndex = _selectedFilterIndex();
 
+    final isOwner = ref.watch(isOwnerProvider);
+    final currentFilter = ref.watch(reportsFilterProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reportes'),
@@ -72,6 +83,10 @@ class _ReportsDashboardScreenState
           children: [
             // ── Filter chips ──
             _buildFilterChips(selectedIndex),
+            const SizedBox(height: 8),
+
+            // ── Sede selector (solo para owner) ──
+            if (isOwner) _buildSedeSelector(currentFilter),
             const SizedBox(height: 16),
 
             // ── KPIs Grid ──
@@ -113,6 +128,43 @@ class _ReportsDashboardScreenState
             _buildQuickAccessGrid(),
           ],
         ),
+      ),
+    );
+  }
+
+  // ───────────────────────────── Sede Selector ─────────────────────────────
+
+  Widget _buildSedeSelector(ReportsFilter currentFilter) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('Todas las sedes'),
+            selected: currentFilter.sede == null,
+            showCheckmark: false,
+            onSelected: (_) {
+              ref.read(reportsFilterProvider.notifier).state =
+                  currentFilter.copyWith(clearSede: true);
+            },
+          ),
+          const SizedBox(width: 8),
+          ...Sede.values.map((sede) {
+            final isSelected = currentFilter.sede == sede.value;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(sede.displayName),
+                selected: isSelected,
+                showCheckmark: false,
+                onSelected: (_) {
+                  ref.read(reportsFilterProvider.notifier).state =
+                      currentFilter.copyWith(sede: sede.value);
+                },
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

@@ -58,11 +58,12 @@ class EventsReportScreen extends ConsumerWidget {
 
   Widget _buildFilterChips(
       BuildContext context, WidgetRef ref, ReportsFilter current) {
+    final currentSede = current.sede;
     final filters = <MapEntry<String, ReportsFilter>>[
-      MapEntry('Hoy', ReportsFilter.today()),
-      MapEntry('7d', ReportsFilter.last7Days()),
-      MapEntry('30d', ReportsFilter.last30Days()),
-      MapEntry('Este mes', ReportsFilter.thisMonth()),
+      MapEntry('Hoy', ReportsFilter.today().copyWith(sede: currentSede)),
+      MapEntry('7d', ReportsFilter.last7Days().copyWith(sede: currentSede)),
+      MapEntry('30d', ReportsFilter.last30Days().copyWith(sede: currentSede)),
+      MapEntry('Este mes', ReportsFilter.thisMonth().copyWith(sede: currentSede)),
     ];
 
     return SingleChildScrollView(

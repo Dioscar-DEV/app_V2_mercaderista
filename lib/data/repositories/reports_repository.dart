@@ -37,20 +37,22 @@ class ReportsRepository {
       avgClients = totalClients / totalRoutes;
     }
 
-    // Visitas en rango
-    var visitsQuery = _client
-        .from('route_visits')
-        .select('id, client_co_cli')
-        .gte('visited_at', fromStr)
-        .lte('visited_at', toStr);
-    final List<dynamic> visitsData = await visitsQuery;
-
-    final totalVisits = visitsData.length;
-    final uniqueClients = visitsData
-        .map((v) => v['client_co_cli'] as String?)
-        .where((c) => c != null)
-        .toSet()
-        .length;
+    // Visitas en rango (filtrar por route_ids de rutas ya filtradas por sede)
+    int totalVisits = 0;
+    int uniqueClients = 0;
+    final routeIds = routesData.map((r) => r['id'] as String).toList();
+    if (routeIds.isNotEmpty) {
+      final List<dynamic> visitsData = await _client
+          .from('route_visits')
+          .select('id, client_co_cli')
+          .inFilter('route_id', routeIds);
+      totalVisits = visitsData.length;
+      uniqueClients = visitsData
+          .map((v) => v['client_co_cli'] as String?)
+          .where((c) => c != null)
+          .toSet()
+          .length;
+    }
 
     // Eventos en rango
     var eventsQuery = _client
@@ -58,17 +60,20 @@ class ReportsRepository {
         .select('id')
         .gte('start_date', fromStr.split('T')[0])
         .lte('start_date', toStr.split('T')[0]);
+    if (sede != null) eventsQuery = eventsQuery.eq('sede_app', sede);
     final List<dynamic> eventsData = await eventsQuery;
     final totalEvents = eventsData.length;
 
-    // Check-ins en rango
-    var checkInsQuery = _client
-        .from('event_check_ins')
-        .select('id')
-        .gte('check_in_date', fromStr.split('T')[0])
-        .lte('check_in_date', toStr.split('T')[0]);
-    final List<dynamic> checkInsData = await checkInsQuery;
-    final totalCheckIns = checkInsData.length;
+    // Check-ins en rango (filtrar por eventos ya filtrados por sede)
+    int totalCheckIns = 0;
+    final eventIds = eventsData.map((e) => e['id'] as String).toList();
+    if (eventIds.isNotEmpty) {
+      final List<dynamic> checkInsData = await _client
+          .from('event_check_ins')
+          .select('id')
+          .inFilter('event_id', eventIds);
+      totalCheckIns = checkInsData.length;
+    }
 
     return DashboardStats(
       totalRoutes: totalRoutes,
@@ -91,23 +96,27 @@ class ReportsRepository {
     final fromStr = from.toIso8601String().split('T')[0];
     final toStr = to.toIso8601String().split('T')[0];
 
-    // Rutas completadas por día
-    var routesQuery = _client
+    // Todas las rutas del rango (con ID para filtrar visitas)
+    var allRoutesQuery = _client
         .from('routes')
-        .select('scheduled_date, status')
-        .eq('status', 'completed')
+        .select('id, scheduled_date, status')
         .gte('scheduled_date', fromStr)
         .lte('scheduled_date', toStr);
-    if (sede != null) routesQuery = routesQuery.eq('sede_app', sede);
-    final List<dynamic> routesData = await routesQuery;
+    if (sede != null) allRoutesQuery = allRoutesQuery.eq('sede_app', sede);
+    final List<dynamic> allRoutesData = await allRoutesQuery;
 
-    // Visitas por día
-    var visitsQuery = _client
-        .from('route_visits')
-        .select('visited_at')
-        .gte('visited_at', from.toIso8601String())
-        .lte('visited_at', to.toIso8601String());
-    final List<dynamic> visitsData = await visitsQuery;
+    // Solo completadas para el conteo de rutas
+    final routesData = allRoutesData.where((r) => r['status'] == 'completed').toList();
+
+    // Visitas filtradas por las rutas de esta sede
+    final routeIds = allRoutesData.map((r) => r['id'] as String).toList();
+    List<dynamic> visitsData = [];
+    if (routeIds.isNotEmpty) {
+      visitsData = await _client
+          .from('route_visits')
+          .select('visited_at')
+          .inFilter('route_id', routeIds);
+    }
 
     // Construir mapa por día
     final Map<String, DailyTrend> trendMap = {};
@@ -428,17 +437,19 @@ class ReportsRepository {
   Future<EventsStats> getEventsStats({
     required DateTime from,
     required DateTime to,
+    String? sede,
   }) async {
     final fromStr = from.toIso8601String().split('T')[0];
     final toStr = to.toIso8601String().split('T')[0];
 
     // Eventos en rango
-    final List<dynamic> eventsData = await _client
+    var eventsQuery = _client
         .from('events')
         .select('id, name, start_date, end_date, status')
         .gte('start_date', fromStr)
-        .lte('start_date', toStr)
-        .order('start_date', ascending: false);
+        .lte('start_date', toStr);
+    if (sede != null) eventsQuery = eventsQuery.eq('sede_app', sede);
+    final List<dynamic> eventsData = await eventsQuery.order('start_date', ascending: false);
 
     final eventIds = eventsData.map((e) => e['id'] as String).toList();
 

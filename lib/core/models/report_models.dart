@@ -35,11 +35,11 @@ class ReportsFilter {
     return ReportsFilter(from: start, to: end);
   }
 
-  ReportsFilter copyWith({DateTime? from, DateTime? to, String? sede}) {
+  ReportsFilter copyWith({DateTime? from, DateTime? to, String? sede, bool clearSede = false}) {
     return ReportsFilter(
       from: from ?? this.from,
       to: to ?? this.to,
-      sede: sede ?? this.sede,
+      sede: clearSede ? null : (sede ?? this.sede),
     );
   }
 

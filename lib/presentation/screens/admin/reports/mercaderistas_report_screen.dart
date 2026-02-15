@@ -15,18 +15,25 @@ class MercaderistasReportScreen extends ConsumerWidget {
     'Este mes',
   ];
 
-  ReportsFilter _filterFromIndex(int index) {
+  ReportsFilter _filterFromIndex(int index, WidgetRef ref) {
+    final currentSede = ref.read(reportsFilterProvider).sede;
+    ReportsFilter base;
     switch (index) {
       case 0:
-        return ReportsFilter.today();
+        base = ReportsFilter.today();
+        break;
       case 1:
-        return ReportsFilter.last7Days();
+        base = ReportsFilter.last7Days();
+        break;
       case 2:
-        return ReportsFilter.last30Days();
+        base = ReportsFilter.last30Days();
+        break;
       case 3:
       default:
-        return ReportsFilter.thisMonth();
+        base = ReportsFilter.thisMonth();
+        break;
     }
+    return base.copyWith(sede: currentSede);
   }
 
   int _selectedFilterIndex(WidgetRef ref) {
@@ -107,7 +114,7 @@ class MercaderistasReportScreen extends ConsumerWidget {
               showCheckmark: false,
               onSelected: (_) {
                 ref.read(reportsFilterProvider.notifier).state =
-                    _filterFromIndex(index);
+                    _filterFromIndex(index, ref);
               },
             ),
           );
