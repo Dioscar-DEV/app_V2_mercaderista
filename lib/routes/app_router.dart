@@ -23,6 +23,7 @@ import '../presentation/screens/admin/reports/mercaderistas_report_screen.dart';
 import '../presentation/screens/admin/reports/client_coverage_report_screen.dart';
 import '../presentation/screens/admin/reports/routes_report_screen.dart';
 import '../presentation/screens/admin/reports/events_report_screen.dart';
+import '../presentation/screens/admin/reports/form_answers_screen.dart';
 
 /// Configuración de rutas de la aplicación
 class AppRouter {
@@ -152,6 +153,11 @@ class AppRouter {
                 path: 'events',
                 name: 'reports_events',
                 builder: (context, state) => const EventsReportScreen(),
+              ),
+              GoRoute(
+                path: 'answers',
+                name: 'reports_answers',
+                builder: (context, state) => const FormAnswersScreen(),
               ),
             ],
           ),

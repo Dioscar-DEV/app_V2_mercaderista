@@ -506,4 +506,109 @@ class ReportsRepository {
       events: events,
     );
   }
+
+  /// Respuestas de formularios de visitas
+  Future<List<FormAnswerRow>> getFormAnswers({
+    required DateTime from,
+    required DateTime to,
+    String? sede,
+    String? routeTypeId,
+  }) async {
+    // Obtener rutas del rango con filtros
+    var routesQuery = _client
+        .from('routes')
+        .select('id, sede_app, route_type_id, route_types(name)')
+        .gte('scheduled_date', from.toIso8601String().split('T')[0])
+        .lte('scheduled_date', to.toIso8601String().split('T')[0]);
+    if (sede != null) routesQuery = routesQuery.eq('sede_app', sede);
+    if (routeTypeId != null) routesQuery = routesQuery.eq('route_type_id', routeTypeId);
+    final List<dynamic> routesData = await routesQuery;
+
+    final routeIds = routesData.map((r) => r['id'] as String).toList();
+    if (routeIds.isEmpty) return [];
+
+    // Mapa de route_id -> info
+    final routeInfo = <String, Map<String, String>>{};
+    for (final r in routesData) {
+      final typeData = r['route_types'] as Map<String, dynamic>?;
+      routeInfo[r['id'] as String] = {
+        'sede': r['sede_app'] as String? ?? '',
+        'tipo': typeData?['name'] as String? ?? 'Sin tipo',
+      };
+    }
+
+    // Visitas de esas rutas
+    final List<dynamic> visitsData = await _client
+        .from('route_visits')
+        .select('id, route_id, mercaderista_id, client_co_cli, visited_at, users!route_visits_mercaderista_id_fkey(full_name), clients(cli_des)')
+        .inFilter('route_id', routeIds);
+
+    final visitIds = visitsData.map((v) => v['id'] as String).toList();
+    if (visitIds.isEmpty) return [];
+
+    // Mapa de visit_id -> info
+    final visitInfo = <String, Map<String, dynamic>>{};
+    for (final v in visitsData) {
+      final userData = v['users'] as Map<String, dynamic>?;
+      final clientData = v['clients'] as Map<String, dynamic>?;
+      visitInfo[v['id'] as String] = {
+        'mercaderista': userData?['full_name'] as String? ?? 'Sin nombre',
+        'cliente': clientData?['cli_des'] as String? ?? 'Sin cliente',
+        'visited_at': v['visited_at'] as String,
+        'route_id': v['route_id'] as String,
+      };
+    }
+
+    // Respuestas con preguntas
+    final List<dynamic> answersData = await _client
+        .from('route_visit_answers')
+        .select('visit_id, answer_text, answer_number, answer_boolean, answer_json, route_form_questions(question_text, question_type)')
+        .inFilter('visit_id', visitIds);
+
+    final result = <FormAnswerRow>[];
+    for (final a in answersData) {
+      final visitId = a['visit_id'] as String;
+      final visit = visitInfo[visitId];
+      if (visit == null) continue;
+
+      final routeId = visit['route_id'] as String;
+      final route = routeInfo[routeId];
+
+      final questionData = a['route_form_questions'] as Map<String, dynamic>?;
+      final questionText = questionData?['question_text'] as String? ?? '';
+      final questionType = questionData?['question_type'] as String? ?? '';
+
+      // Construir respuesta legible
+      String answer = '';
+      if (a['answer_text'] != null) {
+        answer = a['answer_text'] as String;
+      } else if (a['answer_number'] != null) {
+        answer = a['answer_number'].toString();
+      } else if (a['answer_boolean'] != null) {
+        answer = (a['answer_boolean'] as bool) ? 'Sí' : 'No';
+      } else if (a['answer_json'] != null) {
+        final json = a['answer_json'] as Map<String, dynamic>;
+        if (json.containsKey('options')) {
+          final options = json['options'] as List<dynamic>;
+          answer = options.join(', ');
+        } else {
+          answer = json.toString();
+        }
+      }
+
+      result.add(FormAnswerRow(
+        mercaderista: visit['mercaderista'] as String,
+        cliente: visit['cliente'] as String,
+        tipoRuta: route?['tipo'] ?? '',
+        sede: route?['sede'] ?? '',
+        visitedAt: DateTime.parse(visit['visited_at'] as String),
+        pregunta: questionText,
+        tipoPregunta: questionType,
+        respuesta: answer,
+      ));
+    }
+
+    result.sort((a, b) => b.visitedAt.compareTo(a.visitedAt));
+    return result;
+  }
 }

@@ -246,3 +246,25 @@ class EventReportDetail {
   double get attendanceRate =>
       assignedCount > 0 ? checkInCount / assignedCount : 0;
 }
+
+class FormAnswerRow {
+  final String mercaderista;
+  final String cliente;
+  final String tipoRuta;
+  final String sede;
+  final DateTime visitedAt;
+  final String pregunta;
+  final String tipoPregunta;
+  final String respuesta;
+
+  const FormAnswerRow({
+    required this.mercaderista,
+    required this.cliente,
+    required this.tipoRuta,
+    required this.sede,
+    required this.visitedAt,
+    required this.pregunta,
+    required this.tipoPregunta,
+    required this.respuesta,
+  });
+}

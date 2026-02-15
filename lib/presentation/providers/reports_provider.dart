@@ -87,3 +87,10 @@ final eventsStatsProvider = FutureProvider<EventsStats>((ref) async {
   final repo = ref.watch(reportsRepositoryProvider);
   return repo.getEventsStats(from: filter.from, to: filter.to, sede: filter.sede);
 });
+
+/// Respuestas de formularios
+final formAnswersProvider = FutureProvider<List<FormAnswerRow>>((ref) async {
+  final filter = ref.watch(reportsFilterProvider);
+  final repo = ref.watch(reportsRepositoryProvider);
+  return repo.getFormAnswers(from: filter.from, to: filter.to, sede: filter.sede);
+});

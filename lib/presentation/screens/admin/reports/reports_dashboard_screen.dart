@@ -579,6 +579,12 @@ class _ReportsDashboardScreenState
               color: Colors.purple,
               onTap: () => context.push('/admin/reports/events'),
             ),
+            _QuickAccessCard(
+              icon: Icons.assignment,
+              title: 'Respuestas',
+              color: Colors.indigo,
+              onTap: () => context.push('/admin/reports/answers'),
+            ),
           ],
         ),
       ],
