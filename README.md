@@ -27,6 +27,9 @@ Aplicacion movil para la gestion de rutas y visitas de mercaderistas de **Grupo 
 19. [Captura de fotos](#captura-de-fotos)
 20. [Configuracion y despliegue](#configuracion-y-despliegue)
 21. [Dependencias principales](#dependencias-principales)
+22. [Plataforma Web / PWA](#plataforma-web--pwa)
+23. [Produccion](#produccion)
+24. [Proximos pasos](#proximos-pasos)
 
 ---
 
@@ -1227,9 +1230,151 @@ flutter pub cache repair
 
 ---
 
+## Plataforma Web / PWA
+
+Ademas de la app nativa Android, Disbattery Trade esta disponible como **Progressive Web App (PWA)** para que usuarios de iOS y cualquier dispositivo puedan acceder desde el navegador.
+
+### URL de produccion
+
+**https://disbattery-trade-app.vercel.app**
+
+### Hosting
+
+Desplegado en **Vercel** como sitio estatico. La configuracion esta en `build/web/vercel.json`:
+
+```json
+{
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [
+    { "source": "/((?!assets|icons|canvaskit|favicon|manifest|flutter).*)", "destination": "/index.html" }
+  ]
+}
+```
+
+### Diferencias Web vs Mobile
+
+| Caracteristica | Mobile (APK) | Web (PWA) |
+|---|---|---|
+| Modo offline | Si (SQLite + sync) | No (requiere conexion) |
+| GPS | Nativo | API del navegador |
+| Camara | Nativa | API del navegador |
+| Notificaciones push | Si (futuro) | Limitado |
+| Instalable | APK directo | "Agregar a inicio" desde el navegador |
+
+### Arquitectura Web
+
+En la version web, el patron **Offline-First** se desactiva automaticamente. El repositorio `OfflineFirstRouteRepository` detecta `kIsWeb` (constante de Flutter) y en web va **directo al servidor Supabase**, saltando SQLite que no existe en navegadores.
+
+```dart
+if (kIsWeb) {
+  // Web: directo al servidor
+  return await _remoteRepository.getRoutesForDate(...);
+}
+// Mobile: offline-first con SQLite (sin cambios)
+```
+
+Esto aplica a todas las operaciones: lectura de rutas, inicio/completar visitas, formularios, etc. El codigo mobile permanece **100% intacto**.
+
+### Compilar y desplegar la web
+
+```bash
+# Compilar
+flutter build web --release
+
+# Desplegar a Vercel (desde build/web/)
+cd build/web
+vercel deploy --prod
+```
+
+### PWA en iOS
+
+Los usuarios de iPhone pueden:
+1. Abrir https://disbattery-trade-app.vercel.app en Safari
+2. Presionar el icono de compartir
+3. Seleccionar "Agregar a pantalla de inicio"
+4. La app se instala como icono con el logo de Disbattery
+
+---
+
+## Produccion
+
+### Fecha de lanzamiento
+
+**18 de febrero de 2026** - Salida a produccion con 4 sedes operativas.
+
+### Sedes operativas
+
+| Sede | Zona | Mercaderistas | Supervisores | Clientes |
+|---|---|---|---|---|
+| Grupo Disbattery | Centro Metropolitano | 8 | 2 | 3,153 |
+| Oceano Pacifico (Dislub Oriente) | Oriente | 6 | 1 | 3,093 |
+| Blitz 2000 | Centro - Llano | 2 | 1 | 3,334 |
+| Grupo Victoria | Occidente | 5 | 2 | 2,459 |
+| **Total** | | **21** | **6** | **12,039** |
+
+### Infraestructura
+
+| Servicio | Plataforma | Detalle |
+|---|---|---|
+| Backend | Supabase | PostgreSQL + Auth + Storage + Edge Functions |
+| App Android | APK distribuido | Flutter release build |
+| App Web/PWA | Vercel | https://disbattery-trade-app.vercel.app |
+| Repositorio | GitHub | https://github.com/Dioscar-DEV/app_V2_mercaderista.git |
+| API Externa | Railway | https://apimercaderista-production.up.railway.app |
+
+---
+
+## Proximos pasos
+
+### Distribucion
+
+- [ ] **Google Play Store**: Publicar la app en Play Store para distribucion automatica y actualizaciones OTA
+- [ ] **Apple App Store / TestFlight**: Compilar para iOS y distribuir via TestFlight o App Store (requiere cuenta Apple Developer $99/ano)
+- [ ] **Actualizaciones OTA**: Implementar CodePush o similar para actualizar sin recompilar
+
+### Funcionalidades
+
+- [ ] **Notificaciones push**: Alertas cuando se asigna una nueva ruta, recordatorios de rutas pendientes, avisos de nuevos eventos
+- [ ] **Reportes avanzados**: Exportacion PDF, graficos comparativos entre sedes, tendencias mensuales
+- [ ] **Chat interno**: Comunicacion entre supervisores y mercaderistas dentro de la app
+- [ ] **Firma digital**: Captura de firma del cliente al completar visita
+- [ ] **Lector de codigo de barras**: Escaneo de productos para control de inventario
+- [ ] **Modulo de cobranza**: Registro de pagos y cuentas por cobrar en ruta
+
+### Mejoras de UX
+
+- [ ] **Onboarding**: Tutorial interactivo para nuevos usuarios
+- [ ] **Modo oscuro**: Tema oscuro para uso nocturno o en condiciones de baja luz
+- [ ] **Indicadores de progreso mejorados**: Barra de progreso visual en la ruta del dia
+- [ ] **Busqueda de clientes con filtros avanzados**: Por zona, ultimo visita, estado
+- [ ] **Optimizacion de ruta con GPS**: Sugerir orden optimo de visitas basado en ubicacion
+
+### Infraestructura
+
+- [ ] **CI/CD**: Pipeline automatizado con GitHub Actions para build y deploy automatico
+- [ ] **Monitoring**: Implementar Sentry o Crashlytics para tracking de errores en produccion
+- [ ] **Analytics**: Firebase Analytics o similar para metricas de uso
+- [ ] **Backup automatico**: Respaldos programados de la base de datos Supabase
+- [ ] **CDN para fotos**: Optimizar carga de imagenes con CDN y thumbnails
+
+### Seguridad
+
+- [ ] **Desactivar Edge Functions temporales**: Eliminar o asegurar `bulk-insert-clients` y `bulk-create-users` (actualmente con verify_jwt: false)
+- [ ] **Auditorias de seguridad**: Revisar RLS policies y permisos periodicamente
+- [ ] **Cambio obligatorio de contrasena**: Forzar cambio de contrasena en primer login
+
+---
+
 ## Licencia
 
 Proyecto privado de **Grupo Disbattery**. Todos los derechos reservados.
+
+## Desarrollador
+
+**Dioscar Salcedo** - Desarrollador
+GitHub: [@Dioscar-DEV](https://github.com/Dioscar-DEV)
 
 ## Repositorio
 

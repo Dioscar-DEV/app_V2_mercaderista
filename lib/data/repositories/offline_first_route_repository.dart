@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/models/route.dart';
 import '../../core/models/route_form_question.dart';
@@ -73,13 +74,26 @@ class OfflineFirstRouteRepository {
   /// Obtiene rutas para hoy - OFFLINE FIRST
   /// 1. Retorna datos locales inmediatamente
   /// 2. Sincroniza con servidor en background (silencioso)
+  /// En Web: va directo al servidor (SQLite no existe en web)
   Future<List<AppRoute>> getRoutesForToday({
     required AppUser user,
     bool forceRefresh = false,
   }) async {
     final today = DateTime.now();
-    
-    // 1. Primero intentar obtener de local
+
+    // Web: ir directo al servidor (SQLite no funciona en web)
+    if (kIsWeb) {
+      try {
+        return await _remoteRepository.getRoutesForDate(
+          requestingUser: user,
+          date: today,
+        );
+      } catch (_) {
+        return [];
+      }
+    }
+
+    // Mobile: offline-first con SQLite
     List<AppRoute> localRoutes = [];
     try {
       localRoutes = await _localDb.getRoutesForDate(user.id, today);
@@ -90,7 +104,7 @@ class OfflineFirstRouteRepository {
     // 2. Si forceRefresh o no hay datos locales, intentar sincronizar
     if (forceRefresh || localRoutes.isEmpty) {
       await _syncRoutesFromServer(user, today);
-      
+
       // Recargar desde local después de sync
       try {
         localRoutes = await _localDb.getRoutesForDate(user.id, today);
@@ -148,14 +162,23 @@ class OfflineFirstRouteRepository {
   }
 
   /// Obtiene una ruta por ID - OFFLINE FIRST
+  /// En Web: va directo al servidor
   Future<AppRoute?> getRouteById(String routeId) async {
-    // Primero buscar en local
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        return await _remoteRepository.getRouteById(routeId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Mobile: offline-first
     AppRoute? localRoute;
     try {
       localRoute = await _localDb.getRouteById(routeId);
     } catch (_) {}
 
-    // Si no hay local, intentar desde servidor
     if (localRoute == null && _isOnline) {
       try {
         final remoteRoute = await _remoteRepository.getRouteById(routeId);
@@ -165,9 +188,7 @@ class OfflineFirstRouteRepository {
         }
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Ignorar errores
-      }
+      } catch (_) {}
     }
 
     return localRoute;
@@ -179,10 +200,18 @@ class OfflineFirstRouteRepository {
 
   /// Inicia una ruta - funciona offline
   Future<AppRoute?> startRoute(String routeId) async {
-    // 1. Actualizar localmente primero (is_synced = false)
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        return await _remoteRepository.startRoute(routeId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteStatus(routeId, RouteStatus.inProgress);
 
-    // 2. Intentar sincronizar con servidor
     if (_isOnline) {
       try {
         final result = await _remoteRepository.startRoute(routeId);
@@ -191,7 +220,6 @@ class OfflineFirstRouteRepository {
       } on SocketException catch (_) {
         _isOnline = false;
       } catch (_) {
-        // Guardar para sync posterior
         await _localDb.savePendingSync(
           tableName: 'routes',
           recordId: routeId,
@@ -200,7 +228,6 @@ class OfflineFirstRouteRepository {
         );
       }
     } else {
-      // Guardar operación pendiente
       await _localDb.savePendingSync(
         tableName: 'routes',
         recordId: routeId,
@@ -209,12 +236,21 @@ class OfflineFirstRouteRepository {
       );
     }
 
-    // Retornar versión local
     return _localDb.getRouteById(routeId);
   }
 
   /// Completa una ruta - funciona offline
   Future<AppRoute?> completeRoute(String routeId) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        return await _remoteRepository.completeRoute(routeId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteStatus(routeId, RouteStatus.completed);
 
     if (_isOnline) {
@@ -250,6 +286,19 @@ class OfflineFirstRouteRepository {
     required double latitude,
     required double longitude,
   }) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        await _remoteRepository.startClientVisit(
+          routeClientId: routeClientId,
+          latitude: latitude,
+          longitude: longitude,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteClientStatus(
       routeClientId: routeClientId,
       status: RouteClientStatus.inProgress,
@@ -268,9 +317,7 @@ class OfflineFirstRouteRepository {
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Ya guardado localmente, se sincronizará después
-      }
+      } catch (_) {}
     }
   }
 
@@ -280,6 +327,19 @@ class OfflineFirstRouteRepository {
     required double latitude,
     required double longitude,
   }) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        await _remoteRepository.completeClientVisit(
+          routeClientId: routeClientId,
+          latitude: latitude,
+          longitude: longitude,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteClientStatus(
       routeClientId: routeClientId,
       status: RouteClientStatus.completed,
@@ -298,14 +358,21 @@ class OfflineFirstRouteRepository {
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Ya guardado localmente
-      }
+      } catch (_) {}
     }
   }
 
   /// Omite un cliente - funciona offline
   Future<void> skipClientVisit({required String routeClientId}) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        await _remoteRepository.skipClientVisit(routeClientId);
+      } catch (_) {}
+      return;
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteClientStatus(
       routeClientId: routeClientId,
       status: RouteClientStatus.skipped,
@@ -318,9 +385,7 @@ class OfflineFirstRouteRepository {
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Ya guardado localmente, se sincronizará después
-      }
+      } catch (_) {}
     }
   }
 
@@ -329,6 +394,18 @@ class OfflineFirstRouteRepository {
     required String routeClientId,
     String? reason,
   }) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        await _remoteRepository.markClientClosedTemp(
+          routeClientId: routeClientId,
+          reason: reason,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    // Mobile: offline-first
     await _localDb.updateRouteClientStatus(
       routeClientId: routeClientId,
       status: RouteClientStatus.closedTemp,
@@ -345,9 +422,7 @@ class OfflineFirstRouteRepository {
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Ya guardado localmente, se sincronizará después
-      }
+      } catch (_) {}
     }
   }
 
@@ -357,6 +432,19 @@ class OfflineFirstRouteRepository {
     required double latitude,
     required double longitude,
   }) async {
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        await _remoteRepository.updateClientAfterVisit(
+          clientCoCli: clientCoCli,
+          latitude: latitude,
+          longitude: longitude,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    // Mobile: offline-first
     final data = {
       'client_co_cli': clientCoCli,
       'latitude': latitude,
@@ -374,12 +462,9 @@ class OfflineFirstRouteRepository {
         return;
       } on SocketException catch (_) {
         _isOnline = false;
-      } catch (_) {
-        // Guardar para sync posterior
-      }
+      } catch (_) {}
     }
 
-    // Offline o falló: guardar como pendiente
     await _localDb.savePendingSync(
       tableName: 'clients',
       recordId: clientCoCli,
@@ -519,7 +604,7 @@ class OfflineFirstRouteRepository {
 
   /// Descarga ruta completa para uso offline
   Future<void> downloadRouteForOffline(String routeId) async {
-    if (!_isOnline) return;
+    if (kIsWeb || !_isOnline) return;
 
     try {
       final route = await _remoteRepository.getRouteById(routeId);
@@ -537,8 +622,18 @@ class OfflineFirstRouteRepository {
   }
 
   /// Obtiene preguntas del formulario - OFFLINE FIRST
+  /// En Web: va directo al servidor
   Future<List<RouteFormQuestion>> getFormQuestions(String routeTypeId) async {
-    // Primero buscar en local
+    // Web: directo al servidor
+    if (kIsWeb) {
+      try {
+        return await _remoteRepository.getFormQuestions(routeTypeId);
+      } catch (_) {
+        return [];
+      }
+    }
+
+    // Mobile: offline-first
     try {
       final localQuestions = await _localDb.getFormQuestionsByRouteType(routeTypeId);
       if (localQuestions.isNotEmpty) {
@@ -546,7 +641,6 @@ class OfflineFirstRouteRepository {
       }
     } catch (_) {}
 
-    // Si no hay local y hay conexión, descargar
     if (_isOnline) {
       try {
         final questions = await _remoteRepository.getFormQuestions(routeTypeId);
