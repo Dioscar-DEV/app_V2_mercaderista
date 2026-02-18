@@ -71,19 +71,21 @@ final routesForSelectedDateProvider = FutureProvider<List<AppRoute>>((ref) async
   );
 });
 
-/// Provider de rutas para la semana seleccionada
+/// Provider de rutas para la semana seleccionada (con filtros)
 final routesForWeekProvider = FutureProvider<List<AppRoute>>((ref) async {
   final repository = ref.watch(routeRepositoryProvider);
   final weekStart = ref.watch(selectedWeekStartProvider);
+  final filters = ref.watch(routeFiltersProvider);
   final currentUser = await ref.watch(currentUserProvider.future);
-  
+
   if (currentUser == null) {
     throw Exception('Usuario no autenticado');
   }
-  
+
   return repository.getRoutesForWeek(
     requestingUser: currentUser,
     weekStart: weekStart,
+    filters: filters.hasFilters ? filters : null,
   );
 });
 

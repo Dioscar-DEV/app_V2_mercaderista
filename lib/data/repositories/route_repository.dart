@@ -156,6 +156,7 @@ class RouteRepository {
   Future<List<AppRoute>> getRoutesForWeek({
     required AppUser requestingUser,
     required DateTime weekStart,
+    RouteFilters? filters,
   }) async {
     final weekEnd = weekStart.add(const Duration(days: 6));
     return getRoutes(
@@ -163,6 +164,11 @@ class RouteRepository {
       filters: RouteFilters(
         dateFrom: weekStart,
         dateTo: weekEnd,
+        sedeApp: filters?.sedeApp,
+        mercaderistaId: filters?.mercaderistaId,
+        status: filters?.status,
+        routeTypeId: filters?.routeTypeId,
+        search: filters?.search,
       ),
     );
   }

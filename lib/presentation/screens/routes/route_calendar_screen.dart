@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../../../core/models/route.dart';
 import '../../../core/models/user.dart';
 import '../../../core/enums/route_status.dart';
+import '../../../core/enums/sede.dart';
 import '../../../config/theme_config.dart';
+import '../../../data/repositories/route_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/route_provider.dart';
+import '../../providers/user_provider.dart';
 
 /// Pantalla de calendario de rutas para admin/supervisor
 class RouteCalendarScreen extends ConsumerStatefulWidget {
@@ -33,11 +36,7 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
             tooltip: 'Ir a hoy',
             onPressed: () => _goToToday(),
           ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: 'Filtros',
-            onPressed: () => _showFilters(),
-          ),
+          _buildFilterButton(),
         ],
       ),
       body: Column(
@@ -48,6 +47,9 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
             loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
             error: (e, _) => const SizedBox.shrink(),
           ),
+
+          // Active filters chips
+          _buildActiveFiltersBar(),
 
           // Selector de semana
           _buildWeekSelector(weekStart),
@@ -117,6 +119,109 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
             icon: Icons.store,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActiveFiltersBar() {
+    final filters = ref.watch(routeFiltersProvider);
+    if (!filters.hasFilters) return const SizedBox.shrink();
+
+    final chips = <Widget>[];
+
+    if (filters.sedeApp != null) {
+      final sede = Sede.tryFromString(filters.sedeApp);
+      chips.add(_buildRemovableChip(
+        label: sede?.displayName ?? filters.sedeApp!,
+        icon: Icons.business,
+        onRemove: () => ref.read(routeFiltersProvider.notifier).state = RouteFilters(
+          status: filters.status,
+          mercaderistaId: filters.mercaderistaId,
+          routeTypeId: filters.routeTypeId,
+        ),
+      ));
+    }
+
+    if (filters.status != null) {
+      chips.add(_buildRemovableChip(
+        label: filters.status!.displayName,
+        icon: Icons.flag,
+        onRemove: () => ref.read(routeFiltersProvider.notifier).state = RouteFilters(
+          sedeApp: filters.sedeApp,
+          mercaderistaId: filters.mercaderistaId,
+          routeTypeId: filters.routeTypeId,
+        ),
+      ));
+    }
+
+    if (filters.mercaderistaId != null) {
+      final mercaderistas = ref.watch(activeMercaderistasProvider).valueOrNull ?? [];
+      final merc = mercaderistas.where((m) => m.id == filters.mercaderistaId).firstOrNull;
+      chips.add(_buildRemovableChip(
+        label: merc?.fullName ?? 'Mercaderista',
+        icon: Icons.person,
+        onRemove: () => ref.read(routeFiltersProvider.notifier).state = RouteFilters(
+          sedeApp: filters.sedeApp,
+          status: filters.status,
+          routeTypeId: filters.routeTypeId,
+        ),
+      ));
+    }
+
+    if (filters.routeTypeId != null) {
+      final types = ref.watch(routeTypesProvider).valueOrNull ?? [];
+      final type = types.where((t) => t.id == filters.routeTypeId).firstOrNull;
+      chips.add(_buildRemovableChip(
+        label: type?.name ?? 'Tipo',
+        icon: Icons.category,
+        onRemove: () => ref.read(routeFiltersProvider.notifier).state = RouteFilters(
+          sedeApp: filters.sedeApp,
+          status: filters.status,
+          mercaderistaId: filters.mercaderistaId,
+        ),
+      ));
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: ThemeConfig.primaryColor.withValues(alpha: 0.05),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: chips),
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: () => ref.read(routeFiltersProvider.notifier).state = const RouteFilters(),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Text('Limpiar', style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w500)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemovableChip({
+    required String label,
+    required IconData icon,
+    required VoidCallback onRemove,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Chip(
+        avatar: Icon(icon, size: 16),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        deleteIcon: const Icon(Icons.close, size: 16),
+        onDeleted: onRemove,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        labelPadding: const EdgeInsets.only(left: 4, right: 0),
       ),
     );
   }
@@ -303,10 +408,68 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  Widget _buildFilterButton() {
+    final filters = ref.watch(routeFiltersProvider);
+    final hasFilters = filters.hasFilters;
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: Icon(
+            hasFilters ? Icons.filter_list_off : Icons.filter_list,
+          ),
+          tooltip: hasFilters ? 'Filtros activos' : 'Filtros',
+          onPressed: () => _showFilters(),
+        ),
+        if (hasFilters)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  int _countActiveFilters(RouteFilters filters) {
+    int count = 0;
+    if (filters.sedeApp != null) count++;
+    if (filters.status != null) count++;
+    if (filters.mercaderistaId != null) count++;
+    if (filters.routeTypeId != null) count++;
+    return count;
+  }
+
   void _showFilters() {
-    // TODO: Implementar modal de filtros
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Filtros próximamente')),
+    final currentUser = ref.read(currentUserProvider).valueOrNull;
+    final canViewAllSedes = currentUser?.role.canViewAllSedes ?? false;
+    final isAdmin = currentUser?.role.isAdmin ?? false;
+
+    if (!isAdmin) return;
+
+    final currentFilters = ref.read(routeFiltersProvider);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _RouteFiltersSheet(
+        initialFilters: currentFilters,
+        canViewAllSedes: canViewAllSedes,
+        currentUserSede: currentUser?.sede,
+        onApply: (filters) {
+          ref.read(routeFiltersProvider.notifier).state = filters;
+        },
+      ),
     );
   }
 
@@ -511,5 +674,276 @@ class _RouteCard extends StatelessWidget {
     if (hex.length == 6 || hex.length == 7) buffer.write('ff');
     buffer.write(hex.replaceFirst('#', ''));
     return Color(int.parse(buffer.toString(), radix: 16));
+  }
+}
+
+/// Bottom sheet de filtros para el calendario de rutas
+class _RouteFiltersSheet extends ConsumerStatefulWidget {
+  final RouteFilters initialFilters;
+  final bool canViewAllSedes;
+  final Sede? currentUserSede;
+  final void Function(RouteFilters) onApply;
+
+  const _RouteFiltersSheet({
+    required this.initialFilters,
+    required this.canViewAllSedes,
+    required this.currentUserSede,
+    required this.onApply,
+  });
+
+  @override
+  ConsumerState<_RouteFiltersSheet> createState() => _RouteFiltersSheetState();
+}
+
+class _RouteFiltersSheetState extends ConsumerState<_RouteFiltersSheet> {
+  String? _selectedSede;
+  RouteStatus? _selectedStatus;
+  String? _selectedMercaderistaId;
+  String? _selectedRouteTypeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSede = widget.initialFilters.sedeApp;
+    _selectedStatus = widget.initialFilters.status;
+    _selectedMercaderistaId = widget.initialFilters.mercaderistaId;
+    _selectedRouteTypeId = widget.initialFilters.routeTypeId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mercaderistasAsync = ref.watch(activeMercaderistasProvider);
+    final routeTypesAsync = ref.watch(routeTypesProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (context, scrollController) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: ListView(
+          controller: scrollController,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Title + Clear
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filtros',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                TextButton(
+                  onPressed: _clearAll,
+                  child: const Text('Limpiar todo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // SEDE filter (only for owner)
+            if (widget.canViewAllSedes) ...[
+              const Text('Sede', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildFilterChip(
+                    label: 'Todas',
+                    selected: _selectedSede == null,
+                    onSelected: (_) => setState(() => _selectedSede = null),
+                  ),
+                  ...Sede.values.map((sede) => _buildFilterChip(
+                    label: sede.displayName,
+                    selected: _selectedSede == sede.value,
+                    onSelected: (_) => setState(() {
+                      _selectedSede = _selectedSede == sede.value ? null : sede.value;
+                      // Reset mercaderista when sede changes
+                      _selectedMercaderistaId = null;
+                    }),
+                  )),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // STATUS filter
+            const Text('Estado', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'Todos',
+                  selected: _selectedStatus == null,
+                  onSelected: (_) => setState(() => _selectedStatus = null),
+                ),
+                ...RouteStatus.values.map((status) => _buildFilterChip(
+                  label: status.displayName,
+                  selected: _selectedStatus == status,
+                  onSelected: (_) => setState(() {
+                    _selectedStatus = _selectedStatus == status ? null : status;
+                  }),
+                  color: _statusColor(status),
+                )),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // MERCADERISTA filter
+            const Text('Mercaderista', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 8),
+            mercaderistasAsync.when(
+              data: (mercaderistas) {
+                // Filter by selected sede if any
+                final filtered = _selectedSede != null
+                    ? mercaderistas.where((m) => m.sede?.value == _selectedSede).toList()
+                    : mercaderistas;
+
+                return DropdownButtonFormField<String?>(
+                  value: filtered.any((m) => m.id == _selectedMercaderistaId)
+                      ? _selectedMercaderistaId
+                      : null,
+                  decoration: InputDecoration(
+                    hintText: 'Todos los mercaderistas',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    isDense: true,
+                  ),
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Todos los mercaderistas'),
+                    ),
+                    ...filtered.map((m) => DropdownMenuItem<String?>(
+                      value: m.id,
+                      child: Text(m.fullName, overflow: TextOverflow.ellipsis),
+                    )),
+                  ],
+                  onChanged: (value) => setState(() => _selectedMercaderistaId = value),
+                );
+              },
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text('Error cargando mercaderistas'),
+            ),
+            const SizedBox(height: 20),
+
+            // ROUTE TYPE filter
+            const Text('Tipo de Ruta', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 8),
+            routeTypesAsync.when(
+              data: (types) => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildFilterChip(
+                    label: 'Todos',
+                    selected: _selectedRouteTypeId == null,
+                    onSelected: (_) => setState(() => _selectedRouteTypeId = null),
+                  ),
+                  ...types.map((type) => _buildFilterChip(
+                    label: type.name,
+                    selected: _selectedRouteTypeId == type.id,
+                    onSelected: (_) => setState(() {
+                      _selectedRouteTypeId = _selectedRouteTypeId == type.id ? null : type.id;
+                    }),
+                    color: _hexToColor(type.color),
+                  )),
+                ],
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text('Error cargando tipos'),
+            ),
+            const SizedBox(height: 28),
+
+            // Apply button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: _apply,
+                icon: const Icon(Icons.check),
+                label: const Text('Aplicar Filtros'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+    Color? color,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
+      selectedColor: (color ?? ThemeConfig.primaryColor).withValues(alpha: 0.2),
+      checkmarkColor: color ?? ThemeConfig.primaryColor,
+      labelStyle: TextStyle(
+        color: selected ? (color ?? ThemeConfig.primaryColor) : Colors.grey[700],
+        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+      ),
+    );
+  }
+
+  Color _statusColor(RouteStatus status) {
+    switch (status) {
+      case RouteStatus.planned:
+        return Colors.grey;
+      case RouteStatus.inProgress:
+        return Colors.blue;
+      case RouteStatus.completed:
+        return Colors.green;
+      case RouteStatus.cancelled:
+        return Colors.red;
+    }
+  }
+
+  Color _hexToColor(String hex) {
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+    buffer.write(hex.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
+  void _clearAll() {
+    setState(() {
+      _selectedSede = null;
+      _selectedStatus = null;
+      _selectedMercaderistaId = null;
+      _selectedRouteTypeId = null;
+    });
+  }
+
+  void _apply() {
+    widget.onApply(RouteFilters(
+      sedeApp: _selectedSede,
+      status: _selectedStatus,
+      mercaderistaId: _selectedMercaderistaId,
+      routeTypeId: _selectedRouteTypeId,
+    ));
+    Navigator.of(context).pop();
   }
 }
