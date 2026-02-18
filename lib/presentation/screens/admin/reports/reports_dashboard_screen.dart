@@ -201,13 +201,18 @@ class _ReportsDashboardScreenState
         ? (stats.completedRoutes / stats.totalRoutes * 100).toStringAsFixed(0)
         : '0';
 
-    return GridView.count(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 12) / 2;
+        // Target ~90px height for KPI cards
+        final aspectRatio = cardWidth / 90;
+        return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.6,
+      childAspectRatio: aspectRatio.clamp(1.2, 2.2),
       children: [
         _KpiCard(
           icon: Icons.route,
@@ -234,6 +239,7 @@ class _ReportsDashboardScreenState
           label: 'Eventos',
         ),
       ],
+    ); },
     );
   }
 
@@ -547,45 +553,52 @@ class _ReportsDashboardScreenState
                   fontWeight: FontWeight.bold,
                 )),
         const SizedBox(height: 8),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 2.4,
-          children: [
-            _QuickAccessCard(
-              icon: Icons.people,
-              title: 'Mercaderistas',
-              color: Colors.teal,
-              onTap: () => context.push('/admin/reports/mercaderistas'),
-            ),
-            _QuickAccessCard(
-              icon: Icons.store,
-              title: 'Clientes',
-              color: Colors.orange,
-              onTap: () => context.push('/admin/reports/clients'),
-            ),
-            _QuickAccessCard(
-              icon: Icons.route,
-              title: 'Rutas',
-              color: Colors.blue,
-              onTap: () => context.push('/admin/reports/routes'),
-            ),
-            _QuickAccessCard(
-              icon: Icons.event,
-              title: 'Eventos',
-              color: Colors.purple,
-              onTap: () => context.push('/admin/reports/events'),
-            ),
-            _QuickAccessCard(
-              icon: Icons.assignment,
-              title: 'Respuestas',
-              color: Colors.indigo,
-              onTap: () => context.push('/admin/reports/answers'),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = (constraints.maxWidth - 12) / 2;
+            // Target ~48px height for quick access cards
+            final aspectRatio = cardWidth / 48;
+            return GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: aspectRatio.clamp(1.8, 3.2),
+              children: [
+                _QuickAccessCard(
+                  icon: Icons.people,
+                  title: 'Mercaderistas',
+                  color: Colors.teal,
+                  onTap: () => context.push('/admin/reports/mercaderistas'),
+                ),
+                _QuickAccessCard(
+                  icon: Icons.store,
+                  title: 'Clientes',
+                  color: Colors.orange,
+                  onTap: () => context.push('/admin/reports/clients'),
+                ),
+                _QuickAccessCard(
+                  icon: Icons.route,
+                  title: 'Rutas',
+                  color: Colors.blue,
+                  onTap: () => context.push('/admin/reports/routes'),
+                ),
+                _QuickAccessCard(
+                  icon: Icons.event,
+                  title: 'Eventos',
+                  color: Colors.purple,
+                  onTap: () => context.push('/admin/reports/events'),
+                ),
+                _QuickAccessCard(
+                  icon: Icons.assignment,
+                  title: 'Respuestas',
+                  color: Colors.indigo,
+                  onTap: () => context.push('/admin/reports/answers'),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -701,21 +714,23 @@ class _QuickAccessCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(width: 10),
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+              Icon(Icons.chevron_right, color: Colors.grey[400], size: 18),
             ],
           ),
         ),

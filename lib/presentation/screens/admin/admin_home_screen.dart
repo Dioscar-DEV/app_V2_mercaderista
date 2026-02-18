@@ -205,13 +205,19 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                GridView.count(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Adapt aspect ratio to available width
+                    final cardWidth = (constraints.maxWidth - 8) / 2;
+                    // Target ~130px height for module cards
+                    final aspectRatio = cardWidth / 130;
+                    return GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
-                  childAspectRatio: 1.2,
+                  childAspectRatio: aspectRatio.clamp(0.9, 1.5),
                   children: [
                     _ModuleCard(
                       icon: Icons.route,
@@ -272,6 +278,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       onTap: () => _handleLogout(context),
                     ),
                   ],
+                ); },
                 ),
               ],
             ),
@@ -479,28 +486,32 @@ class _ModuleCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 40),
-              const SizedBox(height: 8),
+              Icon(icon, color: color, size: 36),
+              const SizedBox(height: 6),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

@@ -273,13 +273,18 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
                         ),
                   ),
                   const SizedBox(height: 8),
-                  GridView.count(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = (constraints.maxWidth - 8) / 2;
+                      // Target ~90px height for quick access cards
+                      final aspectRatio = cardWidth / 90;
+                      return GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 8,
                     crossAxisSpacing: 8,
-                    childAspectRatio: 1.5,
+                    childAspectRatio: aspectRatio.clamp(1.1, 2.0),
                     children: [
                       _QuickAccessCard(
                         icon: Icons.history,
@@ -310,6 +315,7 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
                         onTap: () => _handleLogout(context, ref),
                       ),
                     ],
+                  ); },
                   ),
                 ],
               ),
@@ -969,24 +975,29 @@ class _QuickAccessCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 28,
+                color: Theme.of(context).colorScheme.primary,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
