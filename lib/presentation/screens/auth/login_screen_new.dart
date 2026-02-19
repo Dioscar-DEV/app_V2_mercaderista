@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 
@@ -17,6 +18,20 @@ class _LoginScreenNewState extends ConsumerState<LoginScreenNew> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _appVersion = info.version);
+    }
+  }
 
   @override
   void dispose() {
@@ -279,7 +294,7 @@ class _LoginScreenNewState extends ConsumerState<LoginScreenNew> {
 
                           // Versión
                           Text(
-                            'Version: 1.0.0',
+                            _appVersion.isNotEmpty ? 'Version: $_appVersion' : '',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[500],
