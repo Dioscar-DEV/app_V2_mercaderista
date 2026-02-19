@@ -43,7 +43,7 @@ enum Sede {
   grupoDisbattery('grupo_disbattery', 'Grupo Disbattery', Region.centroCapital),
 
   // ZONA ORIENTE
-  oceanoPacifico('oceano_pacifico', 'Oceano Pacifico', Region.oriente),
+  oceanoPacifico('oceano_pacifico', 'Dislub Oriente', Region.oriente),
 
   // ZONA CENTRO
   blitz2000('blitz_2000', 'Blitz 2000', Region.centroLosLlanos),

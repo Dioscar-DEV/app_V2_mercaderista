@@ -8,6 +8,23 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.2.0+3] - 2026-02-19
+
+### Nuevas funcionalidades
+- **Nombre completo y RIF en tarjeta de cliente**: Al expandir un cliente en la ejecucion de ruta, ahora se muestra el nombre completo (sin truncar) y el RIF
+- **Nombre visible en 2 lineas**: El nombre del cliente en la lista ahora muestra hasta 2 lineas en vez de 1
+- **Fotos de planograma y afiche Qualid en Merchandising**: Se agregaron 2 nuevas preguntas obligatorias al inicio de la seccion Qualid: "Foto actual planograma Qualid" y "Foto afiche principal Qualid"
+
+### Cambios
+- **Oceano Pacifico renombrado a Dislub Oriente**: Se actualizo el nombre de la sede en toda la aplicacion
+- **Version dinamica en login**: La version en la pantalla de login ahora se lee automaticamente del pubspec.yaml (package_info_plus)
+
+### Correcciones de datos
+- Clientes CLI01465 y CLI01471 reasignados de grupo_disbattery a grupo_victoria
+- Cliente CLI01493 insertado en grupo_victoria (no existia en Supabase)
+
+---
+
 ## [1.1.0+2] - 2026-02-18
 
 ### Nuevas funcionalidades
@@ -31,7 +48,7 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 ### Funcionalidades base
 - Autenticacion con Supabase Auth (login/registro)
 - Gestion de usuarios por roles (Owner, Supervisor, Mercaderista)
-- Sistema de sedes (Grupo Disbattery, Oceano Pacifico, Blitz 2000, Grupo Victoria)
+- Sistema de sedes (Grupo Disbattery, Dislub Oriente, Blitz 2000, Grupo Victoria)
 - Calendario semanal de rutas
 - Creacion de rutas manual y desde plantillas
 - Ejecucion de rutas con GPS tracking

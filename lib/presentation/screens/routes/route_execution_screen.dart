@@ -420,7 +420,7 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
                                 ? Colors.grey
                                 : null,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (client?.direc1 != null)
@@ -465,6 +465,28 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         children: [
           // Client details
           if (client != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                client.cliDes,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (client.rif != null && client.rif!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.assignment_ind, size: 14, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text('RIF: ${client.rif}',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                  ],
+                ),
+              ),
             if (client.direc1 != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
