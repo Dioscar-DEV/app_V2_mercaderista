@@ -244,7 +244,16 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
           isLoading: false,
           isOfflineMode: !_offlineRepository.isOnline,
         );
-        
+
+        // Restaurar pending visits de SQLite (sobreviven app kills)
+        try {
+          final savedPendingVisits =
+              await _offlineRepository.getPendingVisits(routeId);
+          if (savedPendingVisits.isNotEmpty) {
+            state = state.copyWith(pendingVisits: savedPendingVisits);
+          }
+        } catch (_) {}
+
         // Si hay conexión, intentar actualizar en background (silencioso)
         if (_offlineRepository.isOnline) {
           _syncRouteInBackground(routeId);
@@ -296,6 +305,9 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
   /// Sincroniza ruta en background (silencioso)
   Future<void> _syncRouteInBackground(String routeId) async {
     try {
+      // Primero subir cambios locales para que Supabase tenga datos actualizados
+      await _offlineRepository.syncPendingChanges();
+
       final data = await _onlineRepository.getRouteForOffline(routeId);
       final route = data['route'] as AppRoute;
       final questions = data['questions'] as List<RouteFormQuestion>;
@@ -603,7 +615,9 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
   }
 
   /// Agrega una visita pendiente (para sincronizar después)
+  /// También persiste en SQLite para sobrevivir app kills
   void addPendingVisit(RouteVisit visit) {
+    _offlineRepository.savePendingVisit(visit);
     state = state.copyWith(
       pendingVisits: [...state.pendingVisits, visit],
     );
@@ -623,6 +637,10 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
 
     try {
       await _onlineRepository.syncPendingVisits(state.pendingVisits);
+      // Limpiar SQLite tras sync exitoso
+      if (state.route?.id != null) {
+        await _offlineRepository.deletePendingVisits(state.route!.id);
+      }
       state = state.copyWith(pendingVisits: []);
     } catch (e) {
       // Silencioso

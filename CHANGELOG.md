@@ -8,6 +8,15 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.2.2+5] - 2026-02-19
+
+### Correcciones criticas (bugs offline)
+- **Fotos sobreviven bloqueo del telefono**: Las fotos comprimidas ahora se guardan en el directorio permanente de documentos en vez de la carpeta temporal. Android ya no puede borrarlas cuando la app pasa a segundo plano
+- **Visitas completadas no vuelven a "pendiente"**: Se corrigio una race condition donde al recuperar conexion, Supabase sobreescribia el estado local con datos obsoletos antes de que el sync local terminara de subir los completados
+- **Visitas persisten si la app es matada**: Las visitas con formulario completo ahora se guardan en SQLite inmediatamente, no solo en memoria. Si Android mata la app, se restauran al reabrir la ruta
+
+---
+
 ## [1.2.1+4] - 2026-02-19
 
 ### Nuevas funcionalidades

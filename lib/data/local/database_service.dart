@@ -700,12 +700,90 @@ class DatabaseService {
   Future<void> cleanOldRoutes() async {
     final db = await database;
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    
+
     await db.delete(
       'routes',
       where: 'scheduled_date < ? AND is_synced = 1',
       whereArgs: [thirtyDaysAgo.toIso8601String().split('T')[0]],
     );
+  }
+
+  // ========================
+  // PENDING VISITS
+  // ========================
+
+  /// Guarda una visita pendiente en SQLite (para sobrevivir app kills)
+  Future<void> insertPendingVisit(RouteVisit visit) async {
+    final db = await database;
+    final id = visit.id.isNotEmpty
+        ? visit.id
+        : '${visit.routeClientId}_${DateTime.now().millisecondsSinceEpoch}';
+    await db.insert(
+      'pending_visits',
+      {
+        'id': id,
+        'route_id': visit.routeId ?? '',
+        'route_client_id': visit.routeClientId,
+        'client_co_cli': visit.clientCoCli ?? '',
+        'mercaderista_id': visit.mercaderistaId ?? '',
+        'latitude_end': visit.latitude,
+        'longitude_end': visit.longitude,
+        'completed_at': visit.visitedAt.toIso8601String(),
+        'notes': visit.notes,
+        'photos_json': jsonEncode(visit.photos ?? []),
+        'answers_json':
+            jsonEncode(visit.answers?.map((a) => a.toJson()).toList() ?? []),
+        'created_at': visit.createdAt.toIso8601String(),
+        'is_synced': 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Obtiene visitas pendientes de sincronización por rutaId
+  Future<List<RouteVisit>> getPendingVisitsByRoute(String routeId) async {
+    final db = await database;
+    final rows = await db.query(
+      'pending_visits',
+      where: 'route_id = ? AND is_synced = 0',
+      whereArgs: [routeId],
+    );
+    return rows.map((row) {
+      final photosJson = row['photos_json'] as String?;
+      final answersJson = row['answers_json'] as String?;
+      return RouteVisit(
+        id: row['id'] as String,
+        routeClientId: row['route_client_id'] as String,
+        routeId: row['route_id'] as String?,
+        clientCoCli: row['client_co_cli'] as String?,
+        mercaderistaId: row['mercaderista_id'] as String?,
+        visitedAt: DateTime.parse(row['completed_at'] as String),
+        latitude: row['latitude_end'] != null
+            ? (row['latitude_end'] as num).toDouble()
+            : null,
+        longitude: row['longitude_end'] != null
+            ? (row['longitude_end'] as num).toDouble()
+            : null,
+        notes: row['notes'] as String?,
+        photos: photosJson != null
+            ? List<String>.from(jsonDecode(photosJson) as List)
+            : null,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        answers: answersJson != null
+            ? (jsonDecode(answersJson) as List)
+                .map((e) =>
+                    RouteVisitAnswer.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : null,
+      );
+    }).toList();
+  }
+
+  /// Elimina visitas pendientes de una ruta (tras sync exitoso)
+  Future<void> deletePendingVisitsByRoute(String routeId) async {
+    final db = await database;
+    await db.delete('pending_visits',
+        where: 'route_id = ?', whereArgs: [routeId]);
   }
 
   // ========================

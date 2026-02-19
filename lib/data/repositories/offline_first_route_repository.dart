@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/models/route.dart';
+import '../../core/models/route_visit.dart';
 import '../../core/models/route_form_question.dart';
 import '../../core/models/event_check_in.dart';
 import '../../core/models/user.dart';
@@ -657,5 +658,35 @@ class OfflineFirstRouteRepository {
   /// Limpia datos antiguos
   Future<void> cleanOldData() async {
     await _localDb.cleanOldRoutes();
+  }
+
+  // ========================
+  // PENDING VISITS (SQLite)
+  // ========================
+
+  /// Persiste una visita pendiente en SQLite (sobrevive app kills)
+  Future<void> savePendingVisit(RouteVisit visit) async {
+    if (kIsWeb) return;
+    try {
+      await _localDb.insertPendingVisit(visit);
+    } catch (_) {}
+  }
+
+  /// Recupera visitas pendientes de SQLite para una ruta
+  Future<List<RouteVisit>> getPendingVisits(String routeId) async {
+    if (kIsWeb) return [];
+    try {
+      return await _localDb.getPendingVisitsByRoute(routeId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Elimina visitas pendientes de SQLite tras sync exitoso
+  Future<void> deletePendingVisits(String routeId) async {
+    if (kIsWeb) return;
+    try {
+      await _localDb.deletePendingVisitsByRoute(routeId);
+    } catch (_) {}
   }
 }

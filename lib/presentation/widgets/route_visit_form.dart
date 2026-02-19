@@ -470,8 +470,10 @@ class _RouteVisitFormState extends ConsumerState<RouteVisitForm> {
   /// Comprime imagen para reducir tamaño antes de subir
   Future<File> _compressImage(File file) async {
     try {
-      final dir = await getTemporaryDirectory();
-      final targetPath = p.join(dir.path, 'compressed_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final appDir = await getApplicationDocumentsDirectory();
+      final photoDir = Directory('${appDir.path}/visit_photos');
+      if (!await photoDir.exists()) await photoDir.create(recursive: true);
+      final targetPath = p.join(photoDir.path, 'compressed_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
       final result = await FlutterImageCompress.compressAndGetFile(
         file.absolute.path,
