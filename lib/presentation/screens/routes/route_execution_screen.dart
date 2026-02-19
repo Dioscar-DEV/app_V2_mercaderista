@@ -423,6 +423,21 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (client?.isSucursal == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                'Sucursal',
+                                style: TextStyle(fontSize: 10, color: Colors.blue.shade600),
+                              ),
+                            ),
+                          ),
                         if (client?.direc1 != null)
                           Text(
                             client!.direc1!,
@@ -484,6 +499,20 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
                     const SizedBox(width: 6),
                     Text('RIF: ${client.rif}',
                         style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                  ],
+                ),
+              ),
+            if (client.isSucursal)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.account_tree, size: 14, color: Colors.blue.shade400),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Sucursal${client.sucursalNumero != null ? ' #${client.sucursalNumero}' : ''} · Base: ${client.coCliBase}',
+                      style: TextStyle(fontSize: 12, color: Colors.blue.shade600, fontWeight: FontWeight.w500),
+                    ),
                   ],
                 ),
               ),

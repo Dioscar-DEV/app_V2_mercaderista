@@ -139,6 +139,20 @@ class Client {
   /// Verifica si el cliente tiene coordenadas GPS
   bool get hasGPS => latitude != null && longitude != null;
 
+  /// Indica si este cliente es una sucursal (co_cli termina en -N)
+  bool get isSucursal => RegExp(r'-\d+$').hasMatch(coCli);
+
+  /// Código base del cliente sin sufijo de sucursal
+  /// Ej: "B04352-1" → "B04352", "B04352" → "B04352"
+  String get coCliBase =>
+      isSucursal ? coCli.replaceAll(RegExp(r'-\d+$'), '') : coCli;
+
+  /// Número de sucursal (1, 2, 3...) o null si es sede principal
+  int? get sucursalNumero {
+    final match = RegExp(r'-(\d+)$').firstMatch(coCli);
+    return match != null ? int.tryParse(match.group(1)!) : null;
+  }
+
   /// Crea un Client desde un mapa JSON (Supabase)
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
@@ -198,15 +212,28 @@ class Client {
 
   /// Crea un Client desde la respuesta de la API externa
   factory Client.fromExternalApi(Map<String, dynamic> json, int sedeCode, String sedeApp) {
+    final rawCoCli = (json['co_cli'] as String).trim();
+    final rawDirec1 = (json['direc1'] as String?)?.trim();
+    final rawDirEnt2 = (json['dir_ent2'] as String?)?.trim();
+
+    // Si es sucursal (co_cli termina en -N) y tiene dir_ent2 válido, usar dir_ent2 como direc1
+    final isSucursal = RegExp(r'-\d+$').hasMatch(rawCoCli);
+    final resolvedDirec1 = (isSucursal &&
+            rawDirEnt2 != null &&
+            rawDirEnt2.isNotEmpty &&
+            rawDirEnt2 != rawDirec1)
+        ? rawDirEnt2
+        : rawDirec1;
+
     return Client(
-      coCli: (json['co_cli'] as String).trim(),
+      coCli: rawCoCli,
       apiSedecodigo: sedeCode,
       cliDes: json['cli_des'] as String? ?? 'Sin nombre',
       tipCli: (json['tip_cli'] as String?)?.trim(),
       rif: json['rif'] as String?,
       ciudad: json['ciudad'] as String?,
-      direc1: json['direc1'] as String?,
-      dirEnt2: json['dir_ent2'] as String?,
+      direc1: resolvedDirec1,
+      dirEnt2: rawDirEnt2,
       telefonos: json['telefonos'] as String?,
       email: json['email'] as String?,
       emailAlterno: json['email_alterno'] as String?,

@@ -8,6 +8,19 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.2.1+4] - 2026-02-19
+
+### Nuevas funcionalidades
+- **Identificador visual de Sucursales**: Los clientes con sufijo (ej: B04352-1) ahora muestran un chip azul "Sucursal" en el selector de clientes y en la tarjeta de ejecucion de ruta
+- **Agrupamiento de sucursales en selector**: La lista de clientes ahora ordena las sucursales adyacentes a su sede principal (por codigo base)
+- **Detalle de sucursal en ejecucion**: Al expandir un cliente sucursal, se muestra "Sucursal #N · Base: CXXXXX" con icono de arbol
+
+### Correcciones
+- **Direcciones de sucursales correctas**: En el proximo sync (importacion desde API), las sucursales usaran dir_ent2 como direccion principal en vez de copiar la de la sede principal
+- Las 166 sucursales ya corregidas en Supabase con el UPDATE previo mantienen sus direcciones correctas
+
+---
+
 ## [1.2.0+3] - 2026-02-19
 
 ### Nuevas funcionalidades

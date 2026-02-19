@@ -770,7 +770,15 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
       }
       // Filtro de última visita
       return _matchesVisitFilter(c);
-    }).toList();
+    }).toList()
+      ..sort((a, b) {
+        final baseCompare = a.coCliBase.compareTo(b.coCliBase);
+        if (baseCompare != 0) return baseCompare;
+        // Sede principal (sin sufijo) antes que sucursales
+        if (!a.isSucursal && b.isSucursal) return -1;
+        if (a.isSucursal && !b.isSucursal) return 1;
+        return a.coCli.compareTo(b.coCli);
+      });
 
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
@@ -897,7 +905,29 @@ class _ClientSelectorSheetState extends ConsumerState<_ClientSelectorSheet> {
                           color: isSelected ? Colors.white : Colors.grey,
                         ),
                       ),
-                      title: Text(client.cliDes, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      title: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(client.cliDes, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (client.isSucursal)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  border: Border.all(color: Colors.blue.shade200),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Sucursal',
+                                  style: TextStyle(fontSize: 10, color: Colors.blue.shade700),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       subtitle: Row(
                         children: [
                           Expanded(
