@@ -14,12 +14,14 @@ import '../../config/supabase_config.dart';
 /// Fotos desde GALERÍA (no cámara)
 class ImpulsoVisitForm extends ConsumerStatefulWidget {
   final List<RouteFormQuestion> questions;
+  final List<String> availableBrands;
   final Function(List<RouteVisitAnswer> answers, List<String> photoUrls,
       String? observations) onComplete;
 
   const ImpulsoVisitForm({
     super.key,
     required this.questions,
+    this.availableBrands = const ['Shell', 'Qualid'],
     required this.onComplete,
   });
 
@@ -72,6 +74,11 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
   void initState() {
     super.initState();
     for (final q in widget.questions) {
+      // Auto-seleccionar marca si es pregunta de marca y solo hay 1 disponible
+      if (_isBrandQuestion(q) && widget.availableBrands.length == 1) {
+        _answers[q.id] = List<String>.from(widget.availableBrands);
+        continue;
+      }
       switch (q.questionType) {
         case QuestionType.boolean:
         case QuestionType.booleanPhoto:
@@ -94,7 +101,19 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
     if (question.dependsOn == null) return true;
     final parentAnswer = _answers[question.dependsOn];
     if (parentAnswer == null) return false;
+    // Soportar multi-selección: parentAnswer puede ser List<String>
+    if (parentAnswer is List) {
+      return parentAnswer.contains(question.dependsValue);
+    }
     return parentAnswer.toString() == question.dependsValue;
+  }
+
+  /// Detecta si una pregunta es la de "Marca Trabajada"
+  bool _isBrandQuestion(RouteFormQuestion q) {
+    return q.questionType == QuestionType.select &&
+        q.options != null &&
+        q.options!.contains('Shell') &&
+        q.options!.contains('Qualid');
   }
 
   @override
@@ -287,6 +306,9 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
       case QuestionType.text:
         return _buildTextField(question);
       case QuestionType.select:
+        if (_isBrandQuestion(question)) {
+          return _buildBrandMultiSelectField(question);
+        }
         return _buildSelectField(question);
       default:
         return _buildTextField(question);
@@ -434,6 +456,104 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
               .toList() ??
           [],
       onChanged: (value) => setState(() => _answers[question.id] = value),
+    );
+  }
+
+  // --- Brand Multi-Select (Marca Trabajada) ---
+  Widget _buildBrandMultiSelectField(RouteFormQuestion question) {
+    final available = widget.availableBrands;
+    final selected = _answers[question.id];
+    final selectedList = selected is List ? List<String>.from(selected) : <String>[];
+
+    // Si solo hay 1 marca disponible: mostrar chip fijo (auto-seleccionada)
+    if (available.length == 1) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: available.first == 'Shell'
+              ? const Color(0xFFFFDD00).withValues(alpha: 0.15)
+              : const Color(0xFF0066CC).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: available.first == 'Shell'
+                ? const Color(0xFFED1C24).withValues(alpha: 0.3)
+                : const Color(0xFF0066CC).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle,
+                color: available.first == 'Shell'
+                    ? const Color(0xFFED1C24)
+                    : const Color(0xFF0066CC),
+                size: 20),
+            const SizedBox(width: 8),
+            Text(
+              available.first,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: available.first == 'Shell'
+                    ? const Color(0xFFED1C24)
+                    : const Color(0xFF0066CC),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Configurada por supervisor',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2 marcas disponibles: CheckboxListTile para cada una
+    return Column(
+      children: available.map((brand) {
+        final isChecked = selectedList.contains(brand);
+        final Color brandColor = brand == 'Shell'
+            ? const Color(0xFFED1C24)
+            : const Color(0xFF0066CC);
+        final Color bgColor = brand == 'Shell'
+            ? const Color(0xFFFFDD00).withValues(alpha: 0.1)
+            : const Color(0xFF0066CC).withValues(alpha: 0.08);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: isChecked ? bgColor : Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isChecked ? brandColor.withValues(alpha: 0.5) : Colors.grey[300]!,
+              width: isChecked ? 1.5 : 1,
+            ),
+          ),
+          child: CheckboxListTile(
+            value: isChecked,
+            onChanged: (checked) {
+              setState(() {
+                final newList = List<String>.from(selectedList);
+                if (checked == true) {
+                  if (!newList.contains(brand)) newList.add(brand);
+                } else {
+                  newList.remove(brand);
+                }
+                _answers[question.id] = newList;
+              });
+            },
+            title: Text(
+              brand,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isChecked ? brandColor : Colors.grey[700],
+              ),
+            ),
+            activeColor: brandColor,
+            dense: true,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -695,7 +815,13 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
           }
           break;
         case QuestionType.select:
-          if (answer == null) {
+          if (_isBrandQuestion(q)) {
+            // Validar que al menos 1 marca esté seleccionada
+            if (answer == null || (answer is List && answer.isEmpty)) {
+              _showValidationError('Selecciona al menos una marca: ${q.questionText}');
+              return false;
+            }
+          } else if (answer == null) {
             _showValidationError('Selecciona: ${q.questionText}');
             return false;
           }
@@ -800,16 +926,32 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
           continue;
         }
 
-        answers.add(RouteVisitAnswer(
-          id: '',
-          routeVisitId: '',
-          questionId: q.id,
-          answerText: answer is String ? answer : null,
-          answerNumber: answer is num ? answer.toDouble() : null,
-          answerBoolean: answer is bool ? answer : null,
-          answerPhotoUrls: photoUrls,
-          createdAt: DateTime.now(),
-        ));
+        // Para preguntas de marca: guardar como text y options
+        if (_isBrandQuestion(q) && answer is List) {
+          final brandList = List<String>.from(answer);
+          answers.add(RouteVisitAnswer(
+            id: '',
+            routeVisitId: '',
+            questionId: q.id,
+            answerText: brandList.join(', '),
+            answerNumber: null,
+            answerBoolean: null,
+            answerOptions: brandList,
+            answerPhotoUrls: photoUrls,
+            createdAt: DateTime.now(),
+          ));
+        } else {
+          answers.add(RouteVisitAnswer(
+            id: '',
+            routeVisitId: '',
+            questionId: q.id,
+            answerText: answer is String ? answer : null,
+            answerNumber: answer is num ? answer.toDouble() : null,
+            answerBoolean: answer is bool ? answer : null,
+            answerPhotoUrls: photoUrls,
+            createdAt: DateTime.now(),
+          ));
+        }
       }
 
       widget.onComplete(answers, allPhotoUrls, null);

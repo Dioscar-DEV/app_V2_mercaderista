@@ -631,6 +631,7 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         else if (state.route?.routeType?.name == 'Impulso')
           ImpulsoVisitForm(
             questions: state.questions,
+            availableBrands: state.route!.availableBrands,
             onComplete: (answers, photoUrls, observations) {
               _completeVisit(routeClient, answers, photoUrls, observations);
             },

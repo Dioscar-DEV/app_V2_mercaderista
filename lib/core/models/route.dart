@@ -84,6 +84,9 @@ class AppRoute {
   final String sedeApp;
   final String? createdBy;
 
+  // Marcas configuradas para la ruta (solo Impulso)
+  final List<String>? brands;
+
   // Información adicional (no viene de la BD, se carga por separado)
   final String? mercaderistaName;
   final List<RouteClient>? clients;
@@ -108,10 +111,14 @@ class AppRoute {
     this.cancellationReason,
     required this.sedeApp,
     this.createdBy,
+    this.brands,
     this.mercaderistaName,
     this.clients,
     this.routeType,
   });
+
+  /// Marcas disponibles para esta ruta (default: ambas)
+  List<String> get availableBrands => brands ?? ['Shell', 'Qualid'];
 
   /// Crea un AppRoute desde un mapa JSON
   factory AppRoute.fromJson(Map<String, dynamic> json) {
@@ -142,6 +149,7 @@ class AppRoute {
       cancellationReason: json['cancellation_reason'] as String?,
       sedeApp: json['sede_app'] as String? ?? 'grupo_disbattery',
       createdBy: json['created_by'] as String?,
+      brands: json['brands'] != null ? List<String>.from(json['brands']) : null,
       mercaderistaName: json['mercaderista_name'] as String?,
       routeType: json['route_type'] != null
           ? RouteType.fromJson(json['route_type'] as Map<String, dynamic>)
@@ -175,6 +183,7 @@ class AppRoute {
       'cancellation_reason': cancellationReason,
       'sede_app': sedeApp,
       'created_by': createdBy,
+      'brands': brands,
     };
   }
 
@@ -192,6 +201,7 @@ class AppRoute {
       'notes': notes,
       'sede_app': sedeApp,
       'created_by': createdBy,
+      'brands': brands,
     };
   }
 
@@ -232,6 +242,7 @@ class AppRoute {
     String? cancellationReason,
     String? sedeApp,
     String? createdBy,
+    List<String>? brands,
     String? mercaderistaName,
     List<RouteClient>? clients,
     RouteType? routeType,
@@ -255,6 +266,7 @@ class AppRoute {
       cancellationReason: cancellationReason ?? this.cancellationReason,
       sedeApp: sedeApp ?? this.sedeApp,
       createdBy: createdBy ?? this.createdBy,
+      brands: brands ?? this.brands,
       mercaderistaName: mercaderistaName ?? this.mercaderistaName,
       clients: clients ?? this.clients,
       routeType: routeType ?? this.routeType,

@@ -682,6 +682,7 @@ class RouteRepository {
     required String sedeApp,
     required String createdBy,
     String? adminName,
+    List<String>? brands,
   }) async {
     // Obtener la plantilla con sus clientes
     final templateResponse = await _client
@@ -705,6 +706,7 @@ class RouteRepository {
           'sede_app': sedeApp,
           'created_by': createdBy,
           'total_clients': template.clients?.length ?? 0,
+          'brands': brands,
         })
         .select()
         .single();

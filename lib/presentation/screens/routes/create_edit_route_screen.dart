@@ -33,8 +33,12 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
   String? _selectedRouteTypeId;
   String? _selectedTemplateId;
   List<String> _selectedClientIds = [];
+  List<String>? _selectedBrands; // null = ambas marcas
   bool _isLoading = false;
   bool _useTemplate = false;
+
+  // ID del tipo de ruta Impulso
+  static const _impulsoRouteTypeId = 'ca89371f-8948-45e6-91d3-d259650c5a9e';
 
   @override
   void initState() {
@@ -248,11 +252,60 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
                             ],
                           ),
                         )).toList(),
-                        onChanged: (value) => setState(() => _selectedRouteTypeId = value),
+                        onChanged: (value) => setState(() {
+                          _selectedRouteTypeId = value;
+                          // Resetear marcas si cambia el tipo
+                          if (value != _impulsoRouteTypeId) {
+                            _selectedBrands = null;
+                          }
+                        }),
                       ),
                       loading: () => const LinearProgressIndicator(),
                       error: (e, _) => Text('Error: $e'),
                     ),
+
+                    // Selector de marcas (solo para Impulso)
+                    if (_selectedRouteTypeId == _impulsoRouteTypeId) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Marcas a trabajar',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilterChip(
+                            label: const Text('Ambas'),
+                            selected: _selectedBrands == null,
+                            onSelected: (_) => setState(() => _selectedBrands = null),
+                            selectedColor: Colors.blue[100],
+                            checkmarkColor: Colors.blue[800],
+                          ),
+                          FilterChip(
+                            label: const Text('Solo Shell'),
+                            selected: _selectedBrands != null &&
+                                _selectedBrands!.length == 1 &&
+                                _selectedBrands!.contains('Shell'),
+                            onSelected: (_) => setState(() => _selectedBrands = ['Shell']),
+                            selectedColor: const Color(0xFFFFDD00).withValues(alpha: 0.3),
+                            checkmarkColor: const Color(0xFFED1C24),
+                          ),
+                          FilterChip(
+                            label: const Text('Solo Qualid'),
+                            selected: _selectedBrands != null &&
+                                _selectedBrands!.length == 1 &&
+                                _selectedBrands!.contains('Qualid'),
+                            onSelected: (_) => setState(() => _selectedBrands = ['Qualid']),
+                            selectedColor: const Color(0xFF0066CC).withValues(alpha: 0.2),
+                            checkmarkColor: const Color(0xFF0066CC),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 16),
 
                     // Mercaderista asignado
@@ -454,6 +507,7 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           sedeApp: currentUser.sede?.value ?? 'grupo_disbattery',
           createdBy: currentUser.id,
           adminName: currentUser.fullName,
+          brands: _selectedBrands,
         );
       } else {
         // Crear manualmente
@@ -469,6 +523,7 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           routeTypeId: _selectedRouteTypeId,
           notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
           createdBy: currentUser.id,
+          brands: _selectedBrands,
         );
 
         createdRoute = await repository.createRoute(route, adminName: currentUser.fullName);

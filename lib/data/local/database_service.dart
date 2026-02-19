@@ -31,7 +31,7 @@ class DatabaseService {
     
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -60,6 +60,7 @@ class DatabaseService {
         created_by TEXT,
         route_type_name TEXT,
         route_type_color TEXT,
+        brands_json TEXT,
         is_synced INTEGER DEFAULT 1,
         last_synced_at TEXT
       )
@@ -296,6 +297,11 @@ class DatabaseService {
       // Forzar re-descarga de preguntas actualizadas
       await db.execute('DELETE FROM route_form_questions');
     }
+
+    // Migración de v5 a v6: Agregar columna brands_json a routes
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE routes ADD COLUMN brands_json TEXT');
+    }
   }
 
   // ========================
@@ -328,6 +334,7 @@ class DatabaseService {
         'created_by': route.createdBy,
         'route_type_name': route.routeType?.name,
         'route_type_color': route.routeType?.color,
+        'brands_json': route.brands != null ? jsonEncode(route.brands) : null,
         'is_synced': isSynced ? 1 : 0,
         'last_synced_at': isSynced ? DateTime.now().toIso8601String() : null,
       },
@@ -434,6 +441,17 @@ class DatabaseService {
       );
     }
 
+    // Parsear brands desde JSON
+    List<String>? brands;
+    final brandsJson = map['brands_json'] as String?;
+    if (brandsJson != null && brandsJson.isNotEmpty) {
+      try {
+        brands = List<String>.from(jsonDecode(brandsJson) as List);
+      } catch (_) {
+        brands = null;
+      }
+    }
+
     return AppRoute(
       id: map['id'] as String,
       mercaderistaId: map['mercaderista_id'] as String,
@@ -461,6 +479,7 @@ class DatabaseService {
       notes: map['notes'] as String?,
       sedeApp: map['sede_app'] as String,
       createdBy: map['created_by'] as String?,
+      brands: brands,
       clients: clients,
     );
   }
