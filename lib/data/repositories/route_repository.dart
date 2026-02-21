@@ -431,13 +431,16 @@ class RouteRepository {
   }
 
   /// Omite un cliente (skip)
-  Future<RouteClient> skipClientVisit(String routeClientId) async {
+  Future<RouteClient> skipClientVisit(String routeClientId, {String? reason}) async {
+    final updateData = <String, dynamic>{
+      'status': 'skipped',
+      'completed_at': DateTime.now().toIso8601String(),
+    };
+    if (reason != null) updateData['closure_reason'] = reason;
+
     final response = await _client
         .from('route_clients')
-        .update({
-          'status': 'skipped',
-          'completed_at': DateTime.now().toIso8601String(),
-        })
+        .update(updateData)
         .eq('id', routeClientId)
         .select('*, clients(*)')
         .single();
@@ -449,14 +452,18 @@ class RouteRepository {
   Future<RouteClient> markClientClosedTemp({
     required String routeClientId,
     String? reason,
+    String? photoUrl,
   }) async {
+    final updateData = <String, dynamic>{
+      'status': 'closed_temp',
+      'completed_at': DateTime.now().toIso8601String(),
+      'closure_reason': reason,
+    };
+    if (photoUrl != null) updateData['closure_photo_url'] = photoUrl;
+
     final response = await _client
         .from('route_clients')
-        .update({
-          'status': 'closed_temp',
-          'completed_at': DateTime.now().toIso8601String(),
-          'closure_reason': reason,
-        })
+        .update(updateData)
         .eq('id', routeClientId)
         .select('*, clients(*)')
         .single();

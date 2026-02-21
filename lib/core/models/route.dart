@@ -331,6 +331,7 @@ class RouteClient {
   final double? latitudeEnd;
   final double? longitudeEnd;
   final String? closureReason;
+  final String? closurePhotoUrl;
   final DateTime createdAt;
 
   // Información del cliente (cargada por join)
@@ -349,6 +350,7 @@ class RouteClient {
     this.latitudeEnd,
     this.longitudeEnd,
     this.closureReason,
+    this.closurePhotoUrl,
     required this.createdAt,
     this.client,
   });
@@ -371,6 +373,7 @@ class RouteClient {
       latitudeEnd: (json['latitude_end'] as num?)?.toDouble(),
       longitudeEnd: (json['longitude_end'] as num?)?.toDouble(),
       closureReason: json['closure_reason'] as String?,
+      closurePhotoUrl: json['closure_photo_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       client: json['client'] != null
           ? Client.fromJson(json['client'] as Map<String, dynamic>)
@@ -394,6 +397,7 @@ class RouteClient {
       'latitude_end': latitudeEnd,
       'longitude_end': longitudeEnd,
       'closure_reason': closureReason,
+      'closure_photo_url': closurePhotoUrl,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -420,6 +424,7 @@ class RouteClient {
     double? latitudeEnd,
     double? longitudeEnd,
     String? closureReason,
+    String? closurePhotoUrl,
     DateTime? createdAt,
     Client? client,
   }) {
@@ -436,6 +441,7 @@ class RouteClient {
       latitudeEnd: latitudeEnd ?? this.latitudeEnd,
       longitudeEnd: longitudeEnd ?? this.longitudeEnd,
       closureReason: closureReason ?? this.closureReason,
+      closurePhotoUrl: closurePhotoUrl ?? this.closurePhotoUrl,
       createdAt: createdAt ?? this.createdAt,
       client: client ?? this.client,
     );

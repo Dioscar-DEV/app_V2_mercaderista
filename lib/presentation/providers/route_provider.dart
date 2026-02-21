@@ -461,7 +461,7 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
   }
 
   /// Omite el cliente actual - OFFLINE FIRST
-  Future<void> skipCurrentClient() async {
+  Future<void> skipCurrentClient({String? reason}) async {
     final currentClient = state.currentClient;
     if (currentClient == null) return;
 
@@ -469,11 +469,13 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
       // Persistir en SQLite (funciona offline)
       await _offlineRepository.skipClientVisit(
         routeClientId: currentClient.id,
+        reason: reason,
       );
 
       // Actualizar estado en memoria
       final updatedClient = currentClient.copyWith(
         status: RouteClientStatus.skipped,
+        closureReason: reason,
         completedAt: DateTime.now(),
       );
       _updateClientInRoute(updatedClient);
@@ -489,7 +491,7 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
   }
 
   /// Marca el cliente actual como cerrado temporalmente - OFFLINE FIRST
-  Future<void> markCurrentClientClosedTemp({String? reason}) async {
+  Future<void> markCurrentClientClosedTemp({String? reason, String? photoUrl}) async {
     final currentClient = state.currentClient;
     if (currentClient == null) return;
 
@@ -498,12 +500,14 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
       await _offlineRepository.markClientClosedTemp(
         routeClientId: currentClient.id,
         reason: reason,
+        photoUrl: photoUrl,
       );
 
       // Actualizar estado en memoria
       final updatedClient = currentClient.copyWith(
         status: RouteClientStatus.closedTemp,
         closureReason: reason,
+        closurePhotoUrl: photoUrl,
         completedAt: DateTime.now(),
       );
       _updateClientInRoute(updatedClient);

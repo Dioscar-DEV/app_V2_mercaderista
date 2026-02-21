@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/models/route.dart';
 import '../../../core/models/route_visit.dart';
 import '../../../core/models/route_template.dart';
 import '../../../config/theme_config.dart';
+import '../../../config/supabase_config.dart';
 import '../../../data/repositories/route_repository.dart';
 import '../../../data/services/location_service.dart';
 import '../../providers/route_provider.dart';
@@ -591,7 +597,7 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
           ] else if (routeClient.isCompleted) ...[
             _buildCompletedStatus(routeClient),
           ] else if (routeClient.isSkipped) ...[
-            _buildSkippedStatus(),
+            _buildSkippedStatus(routeClient),
           ] else if (routeClient.isClosedTemp) ...[
             _buildClosedStatus(routeClient),
           ],
@@ -754,7 +760,7 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     );
   }
 
-  Widget _buildSkippedStatus() {
+  Widget _buildSkippedStatus(RouteClient routeClient) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -762,16 +768,29 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         color: Colors.orange[50],
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-          Icon(Icons.skip_next, color: Colors.orange[700], size: 20),
-          const SizedBox(width: 8),
-          Text(
-            'Visita Omitida',
-            style: TextStyle(
-                color: Colors.orange[700], fontWeight: FontWeight.w500),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.skip_next, color: Colors.orange[700], size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Visita Omitida',
+                style: TextStyle(
+                    color: Colors.orange[700], fontWeight: FontWeight.w500),
+              ),
+            ],
           ),
+          if (routeClient.closureReason != null &&
+              routeClient.closureReason!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              routeClient.closureReason!,
+              style: TextStyle(color: Colors.orange[400], fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
@@ -809,7 +828,69 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
               textAlign: TextAlign.center,
             ),
           ],
+          if (routeClient.closurePhotoUrl != null &&
+              routeClient.closurePhotoUrl!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => _showFullScreenPhoto(routeClient.closurePhotoUrl!),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: routeClient.closurePhotoUrl!.startsWith('local:')
+                    ? Image.file(
+                        File(routeClient.closurePhotoUrl!.replaceFirst('local:', '')),
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 60,
+                          color: Colors.grey[200],
+                          child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                        ),
+                      )
+                    : Image.network(
+                        routeClient.closurePhotoUrl!,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 60,
+                          color: Colors.grey[200],
+                          child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                        ),
+                      ),
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  void _showFullScreenPhoto(String photoUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(8),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: photoUrl.startsWith('local:')
+                    ? Image.file(File(photoUrl.replaceFirst('local:', '')))
+                    : Image.network(photoUrl),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1008,19 +1089,49 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
   }
 
   Future<void> _skipClient(RouteClient client) async {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Omitir Cliente'),
-        content:
-            const Text('¿Estás seguro de que deseas omitir este cliente?'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('¿Por qué deseas omitir este cliente?'),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo *',
+                  hintText: 'Ej: No se encontraba, dirección incorrecta...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El motivo es obligatorio';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
+            },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             child: const Text('Omitir'),
           ),
@@ -1029,8 +1140,11 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(routeExecutionProvider.notifier).skipCurrentClient();
+      await ref.read(routeExecutionProvider.notifier).skipCurrentClient(
+            reason: reasonController.text.trim(),
+          );
     }
+    reasonController.dispose();
   }
 
   void _showClosedOptions(RouteClient routeClient) {
@@ -1089,79 +1203,78 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
   }
 
   Future<void> _markClientClosedTemp(RouteClient routeClient) async {
+    // 1. Abrir cámara para foto del local cerrado
+    File? photoFile;
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        imageQuality: 80,
+      );
+      if (pickedFile == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Debes tomar foto del local cerrado')),
+        );
+        return;
+      }
+      photoFile = await _compressClosurePhoto(File(pickedFile.path));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al capturar foto: $e'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 2. Mostrar dialog con preview + motivo obligatorio
+    if (!mounted) return;
     final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cerrado Temporalmente'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('¿El negocio está cerrado hoy?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Motivo (opcional)',
-                hintText: 'Ej: Horario reducido, día feriado...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    photoFile!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Foto del local cerrado tomada correctamente.',
+                    style: TextStyle(color: Colors.green, fontSize: 12)),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo *',
+                    hintText: 'Ej: Horario reducido, día feriado...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El motivo es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await ref
-          .read(routeExecutionProvider.notifier)
-          .markCurrentClientClosedTemp(
-            reason: reasonController.text.isEmpty
-                ? null
-                : reasonController.text,
-          );
-    }
-    reasonController.dispose();
-  }
-
-  Future<void> _markClientClosedPermanent(RouteClient routeClient) async {
-    final reasonController = TextEditingController();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cerrado Permanentemente'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'ATENCION: Esto marcará el negocio como cerrado permanentemente en el sistema.',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Motivo *',
-                hintText: 'Ej: Negocio cerró, cambió de dueño...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
         ),
         actions: [
           TextButton(
@@ -1170,14 +1283,156 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('El motivo es obligatorio')),
-                );
-                return;
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
               }
-              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // 3. Subir foto a Supabase Storage
+      String? photoUrl;
+      try {
+        final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
+        final fileName = 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storagePath = '$userId/$fileName';
+        final bytes = await photoFile.readAsBytes();
+        photoUrl = await SupabaseConfig.uploadFile(
+          SupabaseConfig.visitPhotosBucket,
+          storagePath,
+          bytes,
+        );
+      } catch (e) {
+        // Si falla la subida, guardar path local para sync posterior
+        photoUrl = 'local:${photoFile.path}';
+      }
+
+      await ref
+          .read(routeExecutionProvider.notifier)
+          .markCurrentClientClosedTemp(
+            reason: reasonController.text.trim(),
+            photoUrl: photoUrl,
+          );
+    }
+    reasonController.dispose();
+  }
+
+  /// Comprime imagen para foto de cierre
+  Future<File> _compressClosurePhoto(File file) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final photoDir = Directory('${appDir.path}/visit_photos');
+      if (!await photoDir.exists()) await photoDir.create(recursive: true);
+      final targetPath = p.join(
+          photoDir.path, 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        quality: 70,
+        minWidth: 800,
+        minHeight: 800,
+      );
+
+      if (result != null) return File(result.path);
+    } catch (_) {}
+    return file;
+  }
+
+  Future<void> _markClientClosedPermanent(RouteClient routeClient) async {
+    // 1. Abrir cámara para foto del local cerrado
+    File? photoFile;
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        imageQuality: 80,
+      );
+      if (pickedFile == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Debes tomar foto del local cerrado')),
+        );
+        return;
+      }
+      photoFile = await _compressClosurePhoto(File(pickedFile.path));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al capturar foto: $e'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 2. Mostrar dialog con preview + motivo obligatorio
+    if (!mounted) return;
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrado Permanentemente'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'ATENCION: Esto marcará el negocio como cerrado permanentemente en el sistema.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    photoFile!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Foto del local cerrado tomada correctamente.',
+                    style: TextStyle(color: Colors.green, fontSize: 12)),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo *',
+                    hintText: 'Ej: Negocio cerró, cambió de dueño...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El motivo es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Confirmar cierre'),
@@ -1187,17 +1442,34 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     );
 
     if (confirmed == true) {
+      // 3. Subir foto a Supabase Storage
+      String? photoUrl;
+      try {
+        final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
+        final fileName = 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storagePath = '$userId/$fileName';
+        final bytes = await photoFile.readAsBytes();
+        photoUrl = await SupabaseConfig.uploadFile(
+          SupabaseConfig.visitPhotosBucket,
+          storagePath,
+          bytes,
+        );
+      } catch (e) {
+        photoUrl = 'local:${photoFile.path}';
+      }
+
       await ref
           .read(routeExecutionProvider.notifier)
           .markClientPermanentlyClosed(
             clientCoCli: routeClient.clientId,
-            reason: reasonController.text,
+            reason: reasonController.text.trim(),
           );
       // Also mark as closed temp in the current route
       await ref
           .read(routeExecutionProvider.notifier)
           .markCurrentClientClosedTemp(
-            reason: 'Cerrado permanentemente: ${reasonController.text}',
+            reason: 'Cerrado permanentemente: ${reasonController.text.trim()}',
+            photoUrl: photoUrl,
           );
     }
     reasonController.dispose();

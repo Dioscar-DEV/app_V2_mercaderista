@@ -31,7 +31,7 @@ class DatabaseService {
     
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -85,6 +85,7 @@ class DatabaseService {
         client_address TEXT,
         client_phone TEXT,
         closure_reason TEXT,
+        closure_photo_url TEXT,
         is_synced INTEGER DEFAULT 1,
         FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE
       )
@@ -302,6 +303,11 @@ class DatabaseService {
     if (oldVersion < 6) {
       await db.execute('ALTER TABLE routes ADD COLUMN brands_json TEXT');
     }
+
+    // Migración de v6 a v7: Agregar closure_photo_url a route_clients
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE route_clients ADD COLUMN closure_photo_url TEXT');
+    }
   }
 
   // ========================
@@ -372,6 +378,7 @@ class DatabaseService {
         'client_address': client.client?.direc1,
         'client_phone': client.client?.telefonos,
         'closure_reason': client.closureReason,
+        'closure_photo_url': client.closurePhotoUrl,
         'is_synced': isSynced ? 1 : 0,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -514,6 +521,7 @@ class DatabaseService {
       latitudeEnd: map['latitude_end'] as double?,
       longitudeEnd: map['longitude_end'] as double?,
       closureReason: map['closure_reason'] as String?,
+      closurePhotoUrl: map['closure_photo_url'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       client: minimalClient,
     );
@@ -545,6 +553,7 @@ class DatabaseService {
     double? latitudeEnd,
     double? longitudeEnd,
     String? closureReason,
+    String? closurePhotoUrl,
   }) async {
     final db = await database;
 
@@ -560,6 +569,7 @@ class DatabaseService {
     if (latitudeEnd != null) updates['latitude_end'] = latitudeEnd;
     if (longitudeEnd != null) updates['longitude_end'] = longitudeEnd;
     if (closureReason != null) updates['closure_reason'] = closureReason;
+    if (closurePhotoUrl != null) updates['closure_photo_url'] = closurePhotoUrl;
 
     await db.update(
       'route_clients',

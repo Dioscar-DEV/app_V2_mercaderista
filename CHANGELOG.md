@@ -8,6 +8,21 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.2.3+6] - 2026-02-20
+
+### Nuevas funcionalidades
+- **Foto obligatoria al marcar "Cerrado temporalmente"**: Al marcar un cliente como cerrado, se abre la camara para tomar foto del local cerrado. Luego se muestra un dialog con preview de la foto y campo de motivo obligatorio. La foto se sube a Supabase Storage
+- **Foto obligatoria al marcar "Cerrado permanentemente"**: Mismo flujo de camara + preview + motivo obligatorio antes de confirmar el cierre permanente
+- **Motivo obligatorio al "Omitir" cliente**: El dialog de omitir ahora requiere que el mercaderista ingrese un motivo antes de confirmar
+- **Visualizacion de foto y motivo en estados**: La tarjeta de cliente cerrado muestra la foto tomada (tap para ver en pantalla completa) y el motivo. La tarjeta de cliente omitido muestra el motivo ingresado
+
+### Cambios tecnicos
+- Nueva columna `closure_photo_url` en tabla `route_clients` (Supabase + SQLite)
+- Migracion SQLite v6 → v7
+- Propagacion de `photoUrl` y `reason` en toda la cadena: repositorios (online + offline), provider, UI
+
+---
+
 ## [1.2.2+5] - 2026-02-19
 
 ### Correcciones criticas (bugs offline)

@@ -364,11 +364,11 @@ class OfflineFirstRouteRepository {
   }
 
   /// Omite un cliente - funciona offline
-  Future<void> skipClientVisit({required String routeClientId}) async {
+  Future<void> skipClientVisit({required String routeClientId, String? reason}) async {
     // Web: directo al servidor
     if (kIsWeb) {
       try {
-        await _remoteRepository.skipClientVisit(routeClientId);
+        await _remoteRepository.skipClientVisit(routeClientId, reason: reason);
       } catch (_) {}
       return;
     }
@@ -378,11 +378,12 @@ class OfflineFirstRouteRepository {
       routeClientId: routeClientId,
       status: RouteClientStatus.skipped,
       completedAt: DateTime.now(),
+      closureReason: reason,
     );
 
     if (_isOnline) {
       try {
-        await _remoteRepository.skipClientVisit(routeClientId);
+        await _remoteRepository.skipClientVisit(routeClientId, reason: reason);
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
         _isOnline = false;
@@ -394,6 +395,7 @@ class OfflineFirstRouteRepository {
   Future<void> markClientClosedTemp({
     required String routeClientId,
     String? reason,
+    String? photoUrl,
   }) async {
     // Web: directo al servidor
     if (kIsWeb) {
@@ -401,6 +403,7 @@ class OfflineFirstRouteRepository {
         await _remoteRepository.markClientClosedTemp(
           routeClientId: routeClientId,
           reason: reason,
+          photoUrl: photoUrl,
         );
       } catch (_) {}
       return;
@@ -412,6 +415,7 @@ class OfflineFirstRouteRepository {
       status: RouteClientStatus.closedTemp,
       completedAt: DateTime.now(),
       closureReason: reason,
+      closurePhotoUrl: photoUrl,
     );
 
     if (_isOnline) {
@@ -419,6 +423,7 @@ class OfflineFirstRouteRepository {
         await _remoteRepository.markClientClosedTemp(
           routeClientId: routeClientId,
           reason: reason,
+          photoUrl: photoUrl,
         );
         await _localDb.markRouteClientSynced(routeClientId);
       } on SocketException catch (_) {
@@ -524,11 +529,15 @@ class OfflineFirstRouteRepository {
               longitude: clientMap['longitude_end'] as double? ?? 0,
             );
           } else if (status == 'skipped') {
-            await _remoteRepository.skipClientVisit(clientId);
+            await _remoteRepository.skipClientVisit(
+              clientId,
+              reason: clientMap['closure_reason'] as String?,
+            );
           } else if (status == 'closed_temp') {
             await _remoteRepository.markClientClosedTemp(
               routeClientId: clientId,
               reason: clientMap['closure_reason'] as String?,
+              photoUrl: clientMap['closure_photo_url'] as String?,
             );
           }
           
