@@ -7,6 +7,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/models/client.dart';
 import '../../../core/models/route.dart';
 import '../../../core/models/route_visit.dart';
 import '../../../core/models/route_template.dart';
@@ -1554,9 +1555,17 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
 
   Future<void> _addClientsToRoute(AppRoute route) async {
     // Cargar clientes disponibles
-    final clientsAsync = ref.read(clientsProvider);
-    final allClients = clientsAsync.valueOrNull;
-    if (allClients == null || allClients.isEmpty) {
+    final List<Client> allClients;
+    try {
+      allClients = await ref.read(clientsProvider.future);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron cargar los clientes')),
+      );
+      return;
+    }
+    if (allClients.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudieron cargar los clientes')),
