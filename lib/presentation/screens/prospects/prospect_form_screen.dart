@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../config/theme_config.dart';
 import '../../../data/services/location_service.dart';
 import '../../providers/prospect_provider.dart';
@@ -122,10 +123,34 @@ class _ProspectFormScreenState extends ConsumerState<ProspectFormScreen> {
 
     if (!mounted) return;
     if (success) {
+      // Check connectivity to show appropriate message
+      final connectivity = await Connectivity().checkConnectivity();
+      final isOnline = connectivity == ConnectivityResult.wifi ||
+          connectivity == ConnectivityResult.mobile ||
+          connectivity == ConnectivityResult.ethernet;
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Prospecto registrado exitosamente'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                isOnline ? Icons.cloud_done : Icons.cloud_off,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isOnline
+                      ? 'Prospecto registrado exitosamente'
+                      : 'Prospecto guardado localmente. Se sincronizara al volver en linea.',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: isOnline ? Colors.green : Colors.orange,
+          duration: Duration(seconds: isOnline ? 3 : 4),
         ),
       );
       context.pop();

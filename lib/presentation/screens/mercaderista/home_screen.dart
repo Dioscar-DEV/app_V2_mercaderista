@@ -10,6 +10,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/route_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/prospect_provider.dart';
+import '../../../data/repositories/prospect_repository.dart';
 import '../notifications/notifications_drawer.dart';
 
 /// Pantalla principal del mercaderista
@@ -36,21 +38,26 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
           result == ConnectivityResult.mobile ||
           result == ConnectivityResult.ethernet;
       if (mounted && _isOffline != !hasConnection) {
+        final wasOffline = _isOffline;
         setState(() => _isOffline = !hasConnection);
+        // Al volver online, sincronizar prospectos pendientes
+        if (wasOffline && hasConnection) {
+          _syncPendingProspects();
+        }
       }
     });
   }
 
-  /// Descarga automática de rutas al iniciar (silencioso)
+  /// Descarga automática de rutas al iniciar + sync de prospectos pendientes
   Future<void> _autoDownloadRoutesOnInit() async {
     if (_hasAutoDownloaded) return;
     _hasAutoDownloaded = true;
-    
+
     // Esperar a que el usuario se cargue
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (!mounted) return;
-    
+
     try {
       final user = await ref.read(currentUserProvider.future);
       if (user != null) {
@@ -62,6 +69,29 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
       }
     } catch (_) {
       // Silencioso - no importa si falla
+    }
+
+    // Sync prospectos pendientes al iniciar
+    _syncPendingProspects();
+  }
+
+  /// Sincroniza prospectos pendientes de SQLite a Supabase
+  Future<void> _syncPendingProspects() async {
+    if (_isOffline) return;
+    try {
+      final repo = ref.read(prospectRepositoryProvider);
+      final synced = await repo.syncPendingProspects();
+      if (synced > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$synced prospecto(s) sincronizado(s)'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (_) {
+      // Silencioso
     }
   }
 
@@ -902,11 +932,18 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
       if (user != null) {
         await offlineRepo.getRoutesForToday(user: user, forceRefresh: true);
       }
-      
+
+      // También sincronizar prospectos pendientes
+      final prospectRepo = ref.read(prospectRepositoryProvider);
+      final syncedProspects = await prospectRepo.syncPendingProspects();
+
       if (context.mounted) {
+        final extra = syncedProspects > 0
+            ? ' + $syncedProspects prospecto(s) sincronizado(s)'
+            : '';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rutas descargadas correctamente'),
+          SnackBar(
+            content: Text('Rutas descargadas correctamente$extra'),
             backgroundColor: Colors.green,
           ),
         );

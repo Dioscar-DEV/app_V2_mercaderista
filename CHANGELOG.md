@@ -8,6 +8,19 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.3.1+10] - 2026-02-20
+
+### Correcciones
+- **Fix: sincronizacion offline de prospectos**: Corregido bug donde `in_situ` era almacenado como `int` en SQLite pero leido como `bool`, causando un TypeError silencioso que bloqueaba la sincronizacion de prospectos pendientes
+
+### Mejoras UX de sincronizacion
+- **Sync al iniciar app**: Los prospectos pendientes se sincronizan automaticamente al abrir la pantalla Home (con snackbar de feedback)
+- **Sync al recuperar conexion**: Al pasar de offline a online, se sincronizan prospectos pendientes automaticamente
+- **Sync en "Descargar Offline"**: El boton ahora tambien sincroniza prospectos pendientes (subida)
+- **Mensaje diferenciado al guardar prospecto**: Muestra icono y mensaje distinto segun si se guardo online (cloud_done verde) o localmente (cloud_off naranja con aviso de sincronizacion futura)
+
+---
+
 ## [1.3.0+9] - 2026-02-20
 
 ### Nuevas funcionalidades

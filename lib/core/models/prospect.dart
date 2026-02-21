@@ -49,7 +49,9 @@ class Prospect {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       photoUrl: json['photo_url'] as String?,
-      inSitu: json['in_situ'] as bool? ?? true,
+      inSitu: json['in_situ'] is bool
+          ? json['in_situ'] as bool
+          : (json['in_situ'] as int?) == 1,
       sedeApp: json['sede_app'] as String,
       notes: json['notes'] as String?,
       status: json['status'] as String? ?? 'pending',
