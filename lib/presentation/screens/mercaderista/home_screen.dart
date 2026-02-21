@@ -287,13 +287,9 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
                     childAspectRatio: aspectRatio.clamp(1.1, 2.0),
                     children: [
                       _QuickAccessCard(
-                        icon: Icons.history,
-                        title: 'Historial',
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Historial próximamente')),
-                          );
-                        },
+                        icon: Icons.person_add_alt_1,
+                        title: 'Registrar\nProspecto',
+                        onTap: () => context.push('/mercaderista/prospect/new'),
                       ),
                       _QuickAccessCard(
                         icon: Icons.download_for_offline,
@@ -301,17 +297,17 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
                         onTap: () => _downloadForOffline(context, ref),
                       ),
                       _QuickAccessCard(
-                        icon: Icons.settings,
-                        title: 'Configuración',
+                        icon: Icons.history,
+                        title: 'Historial',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Configuración próximamente')),
+                            const SnackBar(content: Text('Historial proximamente')),
                           );
                         },
                       ),
                       _QuickAccessCard(
                         icon: Icons.logout,
-                        title: 'Cerrar Sesión',
+                        title: 'Cerrar Sesion',
                         onTap: () => _handleLogout(context, ref),
                       ),
                     ],

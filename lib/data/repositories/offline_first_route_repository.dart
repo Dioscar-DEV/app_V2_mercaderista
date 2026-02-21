@@ -11,6 +11,7 @@ import '../../core/models/user.dart';
 import '../../core/enums/route_status.dart';
 import '../local/database_service.dart';
 import 'event_repository.dart';
+import 'prospect_repository.dart';
 import 'route_repository.dart';
 
 /// Repositorio que implementa patrón Offline-First
@@ -606,6 +607,14 @@ class OfflineFirstRouteRepository {
         } catch (_) {
           // Continuar con el siguiente
         }
+      }
+
+      // 4. Sincronizar prospectos pendientes
+      try {
+        final prospectRepo = ProspectRepository(db: _localDb);
+        await prospectRepo.syncPendingProspects();
+      } catch (_) {
+        // No bloquear el sync general si falla prospectos
       }
     } finally {
       _isSyncing = false;

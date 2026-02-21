@@ -8,6 +8,24 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.3.0+9] - 2026-02-20
+
+### Nuevas funcionalidades
+- **Registro de prospectos (offline-first)**: Los mercaderistas pueden registrar clientes potenciales desde la pantalla principal. El formulario captura: nombre, RIF, direccion, telefono, persona de contacto, foto del local (camara), ubicacion GPS automatica, si esta en sitio, y notas. Funciona completamente offline con sincronizacion automatica al recuperar conexion
+- **Nuevo acceso rapido "Registrar Prospecto"**: Card visible en la pantalla Home del mercaderista
+
+### Cambios tecnicos
+- Nueva tabla `prospects` en Supabase con RLS (mercaderistas ven los suyos, supervisores ven los de su sede)
+- Modelo Dart `Prospect` con soporte offline (isSynced)
+- Migracion SQLite v7 → v8: tabla `prospects` local
+- Repositorio `ProspectRepository` con patron offline-first: SQLite primero, sync a Supabase despues
+- Provider `ProspectFormNotifier` para gestion de estado del formulario
+- Sync de prospectos integrado en `syncPendingChanges()` (paso 4)
+- Nueva ruta GoRouter `/mercaderista/prospect/new`
+- Fotos de prospectos se suben a bucket `visit-photos` (reutilizado)
+
+---
+
 ## [1.2.5+8] - 2026-02-20
 
 ### Nuevas funcionalidades

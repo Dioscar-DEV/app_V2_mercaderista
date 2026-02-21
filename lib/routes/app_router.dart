@@ -18,6 +18,7 @@ import '../presentation/screens/admin/events/event_list_screen.dart';
 import '../presentation/screens/admin/events/create_edit_event_screen.dart';
 import '../presentation/screens/admin/events/event_detail_screen.dart';
 import '../presentation/screens/events/event_check_in_screen.dart';
+import '../presentation/screens/prospects/prospect_form_screen.dart';
 import '../presentation/screens/admin/reports/reports_dashboard_screen.dart';
 import '../presentation/screens/admin/reports/mercaderistas_report_screen.dart';
 import '../presentation/screens/admin/reports/client_coverage_report_screen.dart';
@@ -199,6 +200,11 @@ class AppRouter {
           final routeId = state.pathParameters['id']!;
           return RouteExecutionScreen(routeId: routeId);
         },
+      ),
+      GoRoute(
+        path: '/mercaderista/prospect/new',
+        name: 'mercaderista_prospect',
+        builder: (context, state) => const ProspectFormScreen(),
       ),
       GoRoute(
         path: '/mercaderista/event/:id',

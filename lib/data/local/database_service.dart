@@ -8,6 +8,7 @@ import '../../core/models/route_type.dart';
 import '../../core/models/client.dart';
 import '../../core/models/route_visit.dart';
 import '../../core/models/route_form_question.dart';
+import '../../core/models/prospect.dart';
 import '../../core/enums/route_status.dart';
 
 /// Servicio de base de datos SQLite para almacenamiento offline
@@ -31,7 +32,7 @@ class DatabaseService {
     
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -199,6 +200,28 @@ class DatabaseService {
       )
     ''');
 
+    // Tabla de prospectos (offline-first)
+    await db.execute('''
+      CREATE TABLE prospects (
+        id TEXT PRIMARY KEY,
+        mercaderista_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        rif TEXT,
+        address TEXT NOT NULL,
+        phone TEXT,
+        contact_person TEXT,
+        latitude REAL,
+        longitude REAL,
+        photo_url TEXT,
+        in_situ INTEGER DEFAULT 1,
+        sede_app TEXT NOT NULL,
+        notes TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
     // Índices para mejorar performance
     await db.execute('CREATE INDEX idx_routes_mercaderista ON routes(mercaderista_id)');
     await db.execute('CREATE INDEX idx_routes_date ON routes(scheduled_date)');
@@ -209,6 +232,8 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_events_date ON events(start_date)');
     await db.execute('CREATE INDEX idx_event_merc_event ON event_mercaderistas(event_id)');
     await db.execute('CREATE INDEX idx_event_checkin_event ON event_check_ins(event_id)');
+    await db.execute('CREATE INDEX idx_prospects_mercaderista ON prospects(mercaderista_id)');
+    await db.execute('CREATE INDEX idx_prospects_synced ON prospects(is_synced)');
   }
 
   Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
@@ -307,6 +332,32 @@ class DatabaseService {
     // Migración de v6 a v7: Agregar closure_photo_url a route_clients
     if (oldVersion < 7) {
       await db.execute('ALTER TABLE route_clients ADD COLUMN closure_photo_url TEXT');
+    }
+
+    // Migración de v7 a v8: Tabla de prospectos
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS prospects (
+          id TEXT PRIMARY KEY,
+          mercaderista_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          rif TEXT,
+          address TEXT NOT NULL,
+          phone TEXT,
+          contact_person TEXT,
+          latitude REAL,
+          longitude REAL,
+          photo_url TEXT,
+          in_situ INTEGER DEFAULT 1,
+          sede_app TEXT NOT NULL,
+          notes TEXT,
+          status TEXT DEFAULT 'pending',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_prospects_mercaderista ON prospects(mercaderista_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_prospects_synced ON prospects(is_synced)');
     }
   }
 
@@ -699,6 +750,7 @@ class DatabaseService {
     final db = await database;
     await db.delete('pending_sync');
     await db.delete('pending_visits');
+    await db.delete('prospects');
     await db.delete('event_check_ins');
     await db.delete('event_mercaderistas');
     await db.delete('events');
@@ -997,6 +1049,61 @@ class DatabaseService {
       where: 'event_id = ? AND mercaderista_id = ?',
       whereArgs: [eventId, mercaderistaId],
       orderBy: 'check_in_date DESC',
+    );
+  }
+
+  // ========================
+  // PROSPECTOS
+  // ========================
+
+  /// Guarda un prospecto localmente
+  Future<void> saveProspect(Prospect prospect) async {
+    final db = await database;
+    await db.insert(
+      'prospects',
+      prospect.toSqlite(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Obtiene prospectos no sincronizados
+  Future<List<Prospect>> getUnsyncedProspects() async {
+    final db = await database;
+    final rows = await db.query('prospects', where: 'is_synced = 0');
+    return rows.map((row) => Prospect.fromJson(row)).toList();
+  }
+
+  /// Obtiene prospectos de un mercaderista
+  Future<List<Prospect>> getProspectsByMercaderista(String mercaderistaId) async {
+    final db = await database;
+    final rows = await db.query(
+      'prospects',
+      where: 'mercaderista_id = ?',
+      whereArgs: [mercaderistaId],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map((row) => Prospect.fromJson(row)).toList();
+  }
+
+  /// Marca un prospecto como sincronizado
+  Future<void> markProspectSynced(String prospectId) async {
+    final db = await database;
+    await db.update(
+      'prospects',
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [prospectId],
+    );
+  }
+
+  /// Actualiza la URL de foto de un prospecto (tras sync)
+  Future<void> updateProspectPhotoUrl(String prospectId, String photoUrl) async {
+    final db = await database;
+    await db.update(
+      'prospects',
+      {'photo_url': photoUrl},
+      where: 'id = ?',
+      whereArgs: [prospectId],
     );
   }
 }
