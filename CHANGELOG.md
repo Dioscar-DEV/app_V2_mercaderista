@@ -8,15 +8,20 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
-## [1.2.4+7] - 2026-02-20
+## [1.2.5+8] - 2026-02-20
 
 ### Nuevas funcionalidades
 - **Supervisor puede agregar clientes a ruta existente**: Nueva opcion "Agregar clientes" en el menu de la pantalla de ejecucion de ruta (solo visible para supervisores). Abre un selector de clientes filtrando los que ya estan en la ruta, inactivos y cerrados permanentemente. Los nuevos clientes se agregan al final con status "Pendiente"
+- **Reactivar rutas completadas**: Al agregar clientes a una ruta ya completada, el status cambia automaticamente a "En progreso" para que el mercaderista pueda continuar trabajando
+
+### Correcciones
+- Corregido error "No se pudieron cargar los clientes" al usar agregar clientes (el provider necesitaba await para cargar)
 
 ### Cambios tecnicos
 - Widget `ClientSelectorSheet` extraido a componente compartido reutilizable
 - Nuevo metodo `appendClientsToRoute` en repositorio con order_number incremental y total_clients correcto
 - Nuevo metodo `addClientsToRoute` en provider de ejecucion de ruta
+- Limpieza de `completed_at` al reactivar ruta completada
 
 ---
 
