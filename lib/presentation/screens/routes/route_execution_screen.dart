@@ -16,6 +16,8 @@ import '../../../data/repositories/route_repository.dart';
 import '../../../data/services/location_service.dart';
 import '../../providers/route_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/client_provider.dart';
+import '../../widgets/client_selector_sheet.dart';
 import '../../widgets/route_visit_form.dart';
 import '../../widgets/merchandising_visit_form.dart';
 import '../../widgets/impulso_visit_form.dart';
@@ -190,6 +192,9 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
                 case 'template':
                   _convertToTemplate(route);
                   break;
+                case 'add_clients':
+                  _addClientsToRoute(route);
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -207,6 +212,14 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
                   child: ListTile(
                     leading: Icon(Icons.cancel, color: Colors.red),
                     title: Text('Cancelar ruta'),
+                  ),
+                ),
+              if (!isMercaderista)
+                const PopupMenuItem(
+                  value: 'add_clients',
+                  child: ListTile(
+                    leading: Icon(Icons.person_add, color: Colors.blue),
+                    title: Text('Agregar clientes'),
                   ),
                 ),
               if (!isMercaderista)
@@ -1537,6 +1550,77 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
       }
     }
     reasonController.dispose();
+  }
+
+  Future<void> _addClientsToRoute(AppRoute route) async {
+    // Cargar clientes disponibles
+    final clientsAsync = ref.read(clientsProvider);
+    final allClients = clientsAsync.valueOrNull;
+    if (allClients == null || allClients.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron cargar los clientes')),
+      );
+      return;
+    }
+
+    // Filtrar: excluir los que ya están en la ruta + cerrados permanentemente + inactivos
+    final existingIds = route.clients?.map((c) => c.clientId).toSet() ?? {};
+    final availableClients = allClients.where((c) {
+      if (existingIds.contains(c.coCli)) return false;
+      if (c.permanentlyClosed == true) return false;
+      if (c.inactivo == true) return false;
+      return true;
+    }).toList();
+
+    if (availableClients.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay clientes disponibles para agregar')),
+      );
+      return;
+    }
+
+    // Abrir selector de clientes
+    if (!mounted) return;
+    final selectedIds = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => ClientSelectorSheet(
+        availableClients: availableClients,
+        selectedClientIds: const [],
+      ),
+    );
+
+    if (selectedIds == null || selectedIds.isEmpty) return;
+
+    // Agregar clientes
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Agregando ${selectedIds.length} cliente(s)...')),
+    );
+
+    final success = await ref
+        .read(routeExecutionProvider.notifier)
+        .addClientsToRoute(selectedIds);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${selectedIds.length} cliente(s) agregado(s)'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error al agregar clientes. Verifica tu conexión.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _convertToTemplate(AppRoute route) async {

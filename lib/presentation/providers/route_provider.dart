@@ -561,6 +561,27 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
     }
   }
 
+  /// Agrega clientes a la ruta actual (solo online, para supervisores)
+  Future<bool> addClientsToRoute(List<String> clientIds) async {
+    if (state.route == null) return false;
+
+    try {
+      final existingCount = state.route!.clients?.length ?? 0;
+      await _onlineRepository.appendClientsToRoute(
+        routeId: state.route!.id,
+        clientIds: clientIds,
+        existingCount: existingCount,
+      );
+
+      // Recargar la ruta completa para refrescar estado con los nuevos clientes
+      await loadRoute(state.route!.id);
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: 'Error al agregar clientes: $e');
+      return false;
+    }
+  }
+
   void _updateClientInRoute(RouteClient updatedClient) {
     if (state.route?.clients == null) return;
 

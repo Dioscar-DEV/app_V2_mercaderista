@@ -348,6 +348,42 @@ class RouteRepository {
         .toList();
   }
 
+  /// Agrega clientes a una ruta existente (append, no reemplazo)
+  Future<List<RouteClient>> appendClientsToRoute({
+    required String routeId,
+    required List<String> clientIds,
+    required int existingCount,
+  }) async {
+    final clientsToInsert = clientIds.asMap().entries.map((entry) {
+      return {
+        'route_id': routeId,
+        'client_co_cli': entry.value,
+        'order_number': existingCount + entry.key + 1,
+        'status': 'pending',
+      };
+    }).toList();
+
+    final response = await _client
+        .from('route_clients')
+        .insert(clientsToInsert)
+        .select('*, clients(*)');
+
+    // Incrementar total_clients (leer actual + sumar)
+    final currentRoute = await _client
+        .from('routes')
+        .select('total_clients')
+        .eq('id', routeId)
+        .single();
+    final currentTotal = currentRoute['total_clients'] as int? ?? 0;
+    await _client.from('routes').update({
+      'total_clients': currentTotal + clientIds.length,
+    }).eq('id', routeId);
+
+    return (response as List)
+        .map((json) => RouteClient.fromJson(json))
+        .toList();
+  }
+
   /// Elimina un cliente de una ruta
   Future<void> removeClientFromRoute({
     required String routeId,
