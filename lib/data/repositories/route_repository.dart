@@ -368,16 +368,21 @@ class RouteRepository {
         .insert(clientsToInsert)
         .select('*, clients(*)');
 
-    // Incrementar total_clients (leer actual + sumar)
+    // Incrementar total_clients y reactivar si estaba completada
     final currentRoute = await _client
         .from('routes')
-        .select('total_clients')
+        .select('total_clients, status')
         .eq('id', routeId)
         .single();
     final currentTotal = currentRoute['total_clients'] as int? ?? 0;
-    await _client.from('routes').update({
+    final updateData = <String, dynamic>{
       'total_clients': currentTotal + clientIds.length,
-    }).eq('id', routeId);
+    };
+    if (currentRoute['status'] == 'completed') {
+      updateData['status'] = 'in_progress';
+      updateData['completed_at'] = null;
+    }
+    await _client.from('routes').update(updateData).eq('id', routeId);
 
     return (response as List)
         .map((json) => RouteClient.fromJson(json))
