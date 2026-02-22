@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -38,13 +40,31 @@ class RouteExecutionScreen extends ConsumerStatefulWidget {
 
 class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
   bool _gpsAvailable = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
 
   @override
   void initState() {
     super.initState();
+    // Limpiar estado de la ruta anterior
+    final notifier = ref.read(routeExecutionProvider.notifier);
+    notifier.clear();
+    // Registrar callback para auto-complete (solo se dispara por accion real del usuario)
+    notifier.onAutoComplete = _showAutoCompleteDialog;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(routeExecutionProvider.notifier).loadRoute(widget.routeId);
       _checkGPS();
+    });
+    // Escuchar cambios de conectividad para auto-sync y actualizar badge
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
+      final isOnline = result == ConnectivityResult.wifi ||
+          result == ConnectivityResult.mobile ||
+          result == ConnectivityResult.ethernet;
+      final notifier = ref.read(routeExecutionProvider.notifier);
+      notifier.setOfflineMode(!isOnline);
+      // Al volver online, sincronizar visitas pendientes automaticamente
+      if (isOnline) {
+        _autoSyncPendingVisits();
+      }
     });
   }
 
@@ -55,9 +75,60 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     }
   }
 
+  /// Sincroniza visitas pendientes automaticamente al volver online
+  Future<void> _autoSyncPendingVisits() async {
+    final state = ref.read(routeExecutionProvider);
+    if (state.pendingVisits.isEmpty) return;
+    try {
+      await ref.read(routeExecutionProvider.notifier).syncPendingVisits();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Visitas sincronizadas automaticamente'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Dialog de auto-complete — solo se llama via callback cuando el usuario
+  /// realmente procesa todos los clientes (no por estado residual)
+  void _showAutoCompleteDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.celebration, color: Colors.green, size: 48),
+        title: const Text('Ruta Finalizada'),
+        content: const Text(
+          'Todos los clientes cuentan con registro. Gracias por tu trabajo.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    ref.read(routeExecutionProvider.notifier).clear();
+    _connectivitySub?.cancel();
+    final notifier = ref.read(routeExecutionProvider.notifier);
+    notifier.onAutoComplete = null; // Limpiar callback
+    notifier.clear();
     super.dispose();
   }
 
@@ -111,6 +182,8 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
         ),
       );
     }
+
+    // (auto-complete dialog se maneja via callback, no via state flag)
 
     final route = executionState.route;
     if (route == null) {

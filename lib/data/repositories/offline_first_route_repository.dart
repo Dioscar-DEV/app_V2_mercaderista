@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../config/supabase_config.dart';
 import '../../core/models/route.dart';
 import '../../core/models/route_visit.dart';
 import '../../core/models/route_form_question.dart';
@@ -34,6 +35,29 @@ class OfflineFirstRouteRepository {
   })  : _remoteRepository = remoteRepository ?? RouteRepository(),
         _localDb = localDb ?? DatabaseService(),
         _connectivity = connectivity ?? Connectivity();
+
+  /// Sube una foto de cierre local a Storage y devuelve la URL pública.
+  Future<String> _uploadLocalClosurePhoto(String localUrl) async {
+    if (kIsWeb) return localUrl;
+    final filePath = localUrl.replaceFirst('local:', '');
+    if (filePath.startsWith('blob:')) return localUrl;
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return localUrl;
+      final bytes = await file.readAsBytes();
+      final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '$userId/closure_${timestamp}_sync.jpg';
+      return await SupabaseConfig.uploadFile(
+        SupabaseConfig.visitPhotosBucket,
+        fileName,
+        bytes,
+      );
+    } catch (e) {
+      print('Error uploading local closure photo: $e');
+      return localUrl;
+    }
+  }
 
   /// Inicia el monitoreo de conectividad
   void startMonitoring() {
@@ -535,10 +559,15 @@ class OfflineFirstRouteRepository {
               reason: clientMap['closure_reason'] as String?,
             );
           } else if (status == 'closed_temp') {
+            // Subir foto de cierre si es local
+            String? closurePhotoUrl = clientMap['closure_photo_url'] as String?;
+            if (closurePhotoUrl != null && closurePhotoUrl.startsWith('local:')) {
+              closurePhotoUrl = await _uploadLocalClosurePhoto(closurePhotoUrl);
+            }
             await _remoteRepository.markClientClosedTemp(
               routeClientId: clientId,
               reason: clientMap['closure_reason'] as String?,
-              photoUrl: clientMap['closure_photo_url'] as String?,
+              photoUrl: closurePhotoUrl,
             );
           }
           
@@ -609,12 +638,46 @@ class OfflineFirstRouteRepository {
         }
       }
 
-      // 4. Sincronizar prospectos pendientes
+      // 4. Sincronizar visitas pendientes desde SQLite
+      try {
+        final unsyncedVisits = await _localDb.getAllUnsyncedPendingVisits();
+        if (unsyncedVisits.isNotEmpty) {
+          final synced = await _remoteRepository.syncPendingVisits(unsyncedVisits);
+          // Marcar cada visita sincronizada individualmente
+          for (final visit in synced) {
+            // Buscar el ID original en SQLite (el de Supabase es nuevo)
+            for (final original in unsyncedVisits) {
+              if (original.routeClientId == visit.routeClientId &&
+                  original.clientCoCli == visit.clientCoCli) {
+                await _localDb.markPendingVisitSynced(original.id);
+                break;
+              }
+            }
+          }
+          print('Synced ${synced.length} pending visits from SQLite');
+        }
+      } catch (e) {
+        print('Error syncing pending visits: $e');
+      }
+
+      // 5. Sincronizar prospectos pendientes
       try {
         final prospectRepo = ProspectRepository(db: _localDb);
         await prospectRepo.syncPendingProspects();
       } catch (_) {
         // No bloquear el sync general si falla prospectos
+      }
+
+      // 6. Re-subir fotos locales que quedaron con prefijo local: en Supabase
+      if (!kIsWeb) {
+        try {
+          final resynced = await _remoteRepository.resyncLocalPhotos();
+          if (resynced > 0) {
+            print('Re-synced $resynced local photos to Storage');
+          }
+        } catch (_) {
+          // No bloquear el sync general si falla re-sync de fotos
+        }
       }
     } finally {
       _isSyncing = false;

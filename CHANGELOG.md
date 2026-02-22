@@ -8,6 +8,41 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.4.4+16] - 2026-02-22
+
+### Correcciones criticas
+- **Fix: Visitas offline no se sincronizaban** — Las visitas con formularios y fotos creadas offline quedaban atrapadas en SQLite y nunca se subian a Supabase. El sync global (`syncPendingChanges`) ahora incluye paso 4: lee todas las visitas pendientes de SQLite y las sube automaticamente, independiente de si la pantalla de ruta esta abierta o no.
+- **Fix: Fotos offline no se subian a Storage** — Cuando una visita o cierre se registraba sin conexion, las fotos quedaban con prefijo `local:` en Supabase. Ahora `syncPendingVisits()` y `syncPendingChanges()` suben las fotos a Storage antes de insertar. Incluye re-sync automatico de fotos `local:` existentes.
+- **Fix: Dialog "Ruta Finalizada" aparecia falsamente** — El flag `autoCompleted` en el state compartido del provider persistia entre rutas y sesiones, causando que el dialog se mostrara al abrir cualquier ruta nueva. Se reemplazo por un sistema de callback (`onAutoComplete`) que solo se dispara cuando el usuario realmente procesa todos los clientes.
+
+### Mejoras
+- **Auto-finalizar ruta via callback**: Cuando todos los clientes de una ruta tienen registro, la ruta se finaliza automaticamente con dialog de felicitacion. Usa callback en vez de flag para evitar falsos positivos.
+- **Auto-sync de visitas al volver online**: Las visitas pendientes se sincronizan automaticamente al recuperar conexion
+- **Badge offline actualizado en tiempo real**
+
+---
+
+## [1.4.1+12] - 2026-02-21
+
+### Correccion critica
+- **Fix: Fotos offline no se subian a Storage** — Cuando una visita o cierre se registraba sin conexion, las fotos quedaban con prefijo `local:` (ruta del dispositivo) en Supabase en vez de subirse al Storage. Ahora:
+  - `syncPendingVisits()` sube las fotos locales a Storage antes de insertar la visita
+  - `syncPendingChanges()` sube las fotos de cierre locales antes de sincronizar el `closed_temp`
+  - **Re-sync automatico**: Al sincronizar, busca registros existentes con fotos `local:` en Supabase y las re-sube desde el dispositivo
+
+---
+
+## [1.4.0+11] - 2026-02-21
+
+### Nuevas funcionalidades
+- **Auto-finalizar ruta**: Cuando todos los clientes de una ruta tienen registro (completado, omitido o cerrado), la ruta se finaliza automaticamente sin necesidad de darle al boton. Muestra un dialog de felicitacion: "Todos los clientes cuentan con registro. Gracias por tu trabajo."
+
+### Mejoras
+- **Auto-sync de visitas al volver online**: Las visitas pendientes (formularios) ahora se sincronizan automaticamente al recuperar conexion, sin necesidad de presionar el boton de sincronizar
+- **Badge offline actualizado en tiempo real**: El indicador "Offline" en la pantalla de ruta ahora se actualiza correctamente al recuperar o perder conexion (antes se quedaba pegado)
+
+---
+
 ## [1.3.1+10] - 2026-02-20
 
 ### Correcciones

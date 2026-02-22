@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../config/supabase_config.dart';
 import '../../core/models/route.dart';
 import '../../core/models/route_type.dart';
 import '../../core/models/route_form_question.dart';
@@ -801,17 +804,55 @@ class RouteRepository {
   // SINCRONIZACIÓN OFFLINE
   // ========================
 
+  /// Sube una foto local a Storage y devuelve la URL pública.
+  /// Si falla o el archivo no existe, devuelve la URL original.
+  Future<String> _uploadLocalPhoto(String localUrl) async {
+    if (kIsWeb) return localUrl; // blob: URLs no son recuperables en web
+    final filePath = localUrl.replaceFirst('local:', '');
+    if (filePath.startsWith('blob:')) return localUrl; // blob URL irrecuperable
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return localUrl;
+      final bytes = await file.readAsBytes();
+      final userId = _client.auth.currentUser?.id ?? 'unknown';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '$userId/visit_${timestamp}_sync.jpg';
+      return await SupabaseConfig.uploadFile(
+        SupabaseConfig.visitPhotosBucket,
+        fileName,
+        bytes,
+      );
+    } catch (e) {
+      print('Error uploading local photo: $e');
+      return localUrl;
+    }
+  }
+
   /// Sincroniza visitas pendientes (creadas offline)
   Future<List<RouteVisit>> syncPendingVisits(List<RouteVisit> visits) async {
     final syncedVisits = <RouteVisit>[];
 
     for (final visit in visits) {
       try {
-        // Insertar la visita
+        // Subir fotos locales a Storage antes de insertar
+        final visitData = visit.toInsertJson();
+        if (visit.photos != null && visit.photos!.isNotEmpty) {
+          final uploadedUrls = <String>[];
+          for (final photoUrl in visit.photos!) {
+            if (photoUrl.startsWith('local:')) {
+              uploadedUrls.add(await _uploadLocalPhoto(photoUrl));
+            } else {
+              uploadedUrls.add(photoUrl);
+            }
+          }
+          visitData['photos'] = uploadedUrls;
+        }
+
+        // Insertar la visita con fotos ya subidas
         final visitResponse = await _client
             .from('route_visits')
             .insert({
-              ...visit.toInsertJson(),
+              ...visitData,
               'synced_at': DateTime.now().toIso8601String(),
             })
             .select()
@@ -838,6 +879,73 @@ class RouteRepository {
     }
 
     return syncedVisits;
+  }
+
+  /// Re-sincroniza fotos con prefijo local: que ya están en Supabase.
+  /// Busca registros con fotos locales y las sube a Storage.
+  /// Retorna la cantidad de fotos re-sincronizadas.
+  Future<int> resyncLocalPhotos() async {
+    int resynced = 0;
+
+    // 1. Re-sync fotos de visitas (route_visits.photos JSONB)
+    try {
+      final visits = await _client
+          .from('route_visits')
+          .select('id, photos')
+          .filter('photos', 'cs', '"local:');
+
+      for (final visit in visits) {
+        final photos = (visit['photos'] as List<dynamic>?)?.cast<String>() ?? [];
+        bool changed = false;
+        final updatedPhotos = <String>[];
+        for (final photo in photos) {
+          if (photo.startsWith('local:')) {
+            final uploaded = await _uploadLocalPhoto(photo);
+            if (uploaded != photo) {
+              changed = true;
+              resynced++;
+            }
+            updatedPhotos.add(uploaded);
+          } else {
+            updatedPhotos.add(photo);
+          }
+        }
+        if (changed) {
+          await _client
+              .from('route_visits')
+              .update({'photos': updatedPhotos})
+              .eq('id', visit['id']);
+        }
+      }
+    } catch (e) {
+      print('Error re-syncing visit photos: $e');
+    }
+
+    // 2. Re-sync fotos de cierre (route_clients.closure_photo_url)
+    try {
+      final clients = await _client
+          .from('route_clients')
+          .select('id, closure_photo_url')
+          .like('closure_photo_url', 'local:%');
+
+      for (final client in clients) {
+        final photoUrl = client['closure_photo_url'] as String?;
+        if (photoUrl != null && photoUrl.startsWith('local:')) {
+          final uploaded = await _uploadLocalPhoto(photoUrl);
+          if (uploaded != photoUrl) {
+            await _client
+                .from('route_clients')
+                .update({'closure_photo_url': uploaded})
+                .eq('id', client['id']);
+            resynced++;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error re-syncing closure photos: $e');
+    }
+
+    return resynced;
   }
 
   /// Obtiene datos completos de ruta para modo offline

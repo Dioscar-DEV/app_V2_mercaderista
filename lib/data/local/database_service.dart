@@ -841,6 +841,55 @@ class DatabaseService {
     }).toList();
   }
 
+  /// Obtiene TODAS las visitas pendientes sin sincronizar (de cualquier ruta)
+  Future<List<RouteVisit>> getAllUnsyncedPendingVisits() async {
+    final db = await database;
+    final rows = await db.query(
+      'pending_visits',
+      where: 'is_synced = 0',
+    );
+    return rows.map((row) {
+      final photosJson = row['photos_json'] as String?;
+      final answersJson = row['answers_json'] as String?;
+      return RouteVisit(
+        id: row['id'] as String,
+        routeClientId: row['route_client_id'] as String,
+        routeId: row['route_id'] as String?,
+        clientCoCli: row['client_co_cli'] as String?,
+        mercaderistaId: row['mercaderista_id'] as String?,
+        visitedAt: DateTime.parse(row['completed_at'] as String),
+        latitude: row['latitude_end'] != null
+            ? (row['latitude_end'] as num).toDouble()
+            : null,
+        longitude: row['longitude_end'] != null
+            ? (row['longitude_end'] as num).toDouble()
+            : null,
+        notes: row['notes'] as String?,
+        photos: photosJson != null
+            ? List<String>.from(jsonDecode(photosJson) as List)
+            : null,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        answers: answersJson != null
+            ? (jsonDecode(answersJson) as List)
+                .map((e) =>
+                    RouteVisitAnswer.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : null,
+      );
+    }).toList();
+  }
+
+  /// Marca una visita pendiente como sincronizada
+  Future<void> markPendingVisitSynced(String visitId) async {
+    final db = await database;
+    await db.update(
+      'pending_visits',
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [visitId],
+    );
+  }
+
   /// Elimina visitas pendientes de una ruta (tras sync exitoso)
   Future<void> deletePendingVisitsByRoute(String routeId) async {
     final db = await database;

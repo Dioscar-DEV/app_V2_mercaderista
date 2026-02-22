@@ -217,6 +217,9 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
   final OfflineFirstRouteRepository _offlineRepository;
   final RouteRepository _onlineRepository;
 
+  /// Callback que se dispara cuando la ruta se auto-completa
+  void Function()? onAutoComplete;
+
   RouteExecutionNotifier(this._offlineRepository, this._onlineRepository) : super(const RouteExecutionState());
 
   /// Carga una ruta para ejecución - OFFLINE FIRST
@@ -595,6 +598,26 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
     );
 
     state = state.copyWith(route: updatedRoute);
+
+    // Verificar si todos los clientes estan procesados → auto-finalizar
+    _checkAutoComplete(updatedClients);
+  }
+
+  /// Verifica si todos los clientes fueron procesados y auto-finaliza la ruta
+  void _checkAutoComplete(List<RouteClient> clients) {
+    if (clients.isEmpty) return;
+    if (state.route?.status == RouteStatus.completed) return;
+    if (state.route?.status == RouteStatus.cancelled) return;
+
+    final allDone = clients.every((c) =>
+        c.isCompleted || c.isSkipped || c.isClosedTemp);
+
+    if (allDone) {
+      // Auto-finalizar
+      completeRoute();
+      // Notificar al screen via callback (no flag en state)
+      onAutoComplete?.call();
+    }
   }
 
   /// Avanza al siguiente cliente
