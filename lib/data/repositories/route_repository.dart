@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/supabase_config.dart';
@@ -599,10 +601,20 @@ class RouteRepository {
     required RouteVisit visit,
     required List<RouteVisitAnswer> answers,
   }) async {
+    // Subir fotos a Storage antes de insertar (en web los blob: expiran al cerrar pestaña)
+    RouteVisit visitToInsert = visit;
+    if (visit.photos != null && visit.photos!.isNotEmpty) {
+      final uploadedPhotos = <String>[];
+      for (final url in visit.photos!) {
+        uploadedPhotos.add(await _uploadPhotoBeforeInsert(url));
+      }
+      visitToInsert = visit.copyWith(photos: uploadedPhotos);
+    }
+
     // Insertar la visita
     final visitResponse = await _client
         .from('route_visits')
-        .insert(visit.toInsertJson())
+        .insert(visitToInsert.toInsertJson())
         .select()
         .single();
 
@@ -803,6 +815,43 @@ class RouteRepository {
   // ========================
   // SINCRONIZACIÓN OFFLINE
   // ========================
+
+  /// Sube una foto a Storage antes de insertar (funciona en web y móvil).
+  /// En web, hace fetch del blob URL mientras sigue válido en la sesión actual.
+  /// En móvil, lee el archivo local.
+  Future<String> _uploadPhotoBeforeInsert(String photoUrl) async {
+    if (!photoUrl.startsWith('local:')) return photoUrl;
+    final filePath = photoUrl.replaceFirst('local:', '');
+    try {
+      Uint8List bytes;
+      if (filePath.startsWith('blob:')) {
+        // Web: fetch del blob URL con dio mientras sigue vivo en esta sesión
+        final dio = Dio();
+        final response = await dio.get<List<int>>(
+          filePath,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (response.statusCode != 200 || response.data == null) return photoUrl;
+        bytes = Uint8List.fromList(response.data!);
+      } else {
+        if (kIsWeb) return photoUrl;
+        final file = File(filePath);
+        if (!await file.exists()) return photoUrl;
+        bytes = await file.readAsBytes();
+      }
+      final userId = _client.auth.currentUser?.id ?? 'unknown';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '$userId/visit_${timestamp}_${filePath.hashCode.abs()}.jpg';
+      return await SupabaseConfig.uploadFile(
+        SupabaseConfig.visitPhotosBucket,
+        fileName,
+        bytes,
+      );
+    } catch (e) {
+      print('Error uploading photo before insert: $e');
+      return photoUrl;
+    }
+  }
 
   /// Sube una foto local a Storage y devuelve la URL pública.
   /// Si falla o el archivo no existe, devuelve la URL original.

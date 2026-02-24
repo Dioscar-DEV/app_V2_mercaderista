@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../config/supabase_config.dart';
@@ -36,11 +38,33 @@ class OfflineFirstRouteRepository {
         _localDb = localDb ?? DatabaseService(),
         _connectivity = connectivity ?? Connectivity();
 
-  /// Sube una foto de cierre local a Storage y devuelve la URL pública.
+  /// Sube una foto de cierre a Storage (funciona en web y móvil).
   Future<String> _uploadLocalClosurePhoto(String localUrl) async {
-    if (kIsWeb) return localUrl;
     final filePath = localUrl.replaceFirst('local:', '');
-    if (filePath.startsWith('blob:')) return localUrl;
+    if (filePath.startsWith('blob:')) {
+      if (!kIsWeb) return localUrl;
+      try {
+        final dio = Dio();
+        final response = await dio.get<List<int>>(
+          filePath,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (response.statusCode != 200 || response.data == null) return localUrl;
+        final bytes = Uint8List.fromList(response.data!);
+        final userId = SupabaseConfig.client.auth.currentUser?.id ?? 'unknown';
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = '$userId/closure_${timestamp}_${filePath.hashCode.abs()}.jpg';
+        return await SupabaseConfig.uploadFile(
+          SupabaseConfig.visitPhotosBucket,
+          fileName,
+          bytes,
+        );
+      } catch (e) {
+        print('Error uploading web closure photo: $e');
+        return localUrl;
+      }
+    }
+    if (kIsWeb) return localUrl;
     try {
       final file = File(filePath);
       if (!await file.exists()) return localUrl;
@@ -422,13 +446,17 @@ class OfflineFirstRouteRepository {
     String? reason,
     String? photoUrl,
   }) async {
-    // Web: directo al servidor
+    // Web: subir foto de cierre antes de enviar al servidor
     if (kIsWeb) {
       try {
+        String? uploadedPhotoUrl = photoUrl;
+        if (photoUrl != null && photoUrl.startsWith('local:')) {
+          uploadedPhotoUrl = await _uploadLocalClosurePhoto(photoUrl);
+        }
         await _remoteRepository.markClientClosedTemp(
           routeClientId: routeClientId,
           reason: reason,
-          photoUrl: photoUrl,
+          photoUrl: uploadedPhotoUrl,
         );
       } catch (_) {}
       return;
