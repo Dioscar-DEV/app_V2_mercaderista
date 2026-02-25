@@ -368,33 +368,57 @@ class DatabaseService {
   /// Guarda o actualiza una ruta localmente
   Future<void> saveRoute(AppRoute route, {bool isSynced = true}) async {
     final db = await database;
-    
+
+    // Si los datos vienen del servidor, preservar status/contadores locales
+    // si la ruta tiene cambios pendientes de sync (is_synced=0).
+    Map<String, dynamic> routeData = {
+      'id': route.id,
+      'mercaderista_id': route.mercaderistaId,
+      'name': route.name,
+      'scheduled_date': route.scheduledDate.toIso8601String().split('T')[0],
+      'status': route.status.value,
+      'total_clients': route.totalClients,
+      'completed_clients': route.completedClients,
+      'estimated_duration': route.estimatedDuration?.toString(),
+      'started_at': route.startedAt?.toIso8601String(),
+      'completed_at': route.completedAt?.toIso8601String(),
+      'created_at': route.createdAt.toIso8601String(),
+      'updated_at': route.updatedAt?.toIso8601String(),
+      'template_id': route.templateId,
+      'route_type_id': route.routeTypeId,
+      'notes': route.notes,
+      'sede_app': route.sedeApp,
+      'created_by': route.createdBy,
+      'route_type_name': route.routeType?.name,
+      'route_type_color': route.routeType?.color,
+      'brands_json': route.brands != null ? jsonEncode(route.brands) : null,
+      'is_synced': isSynced ? 1 : 0,
+      'last_synced_at': isSynced ? DateTime.now().toIso8601String() : null,
+    };
+
+    if (isSynced) {
+      // Si la ruta ya existe con cambios locales no sincronizados,
+      // conservar status, started_at y completed_clients del registro local.
+      final existing = await db.query(
+        'routes',
+        columns: ['is_synced', 'status', 'started_at', 'completed_at', 'completed_clients'],
+        where: 'id = ?',
+        whereArgs: [route.id],
+        limit: 1,
+      );
+      if (existing.isNotEmpty && (existing.first['is_synced'] as int? ?? 1) == 0) {
+        routeData['status'] = existing.first['status'];
+        routeData['started_at'] = existing.first['started_at'];
+        routeData['completed_at'] = existing.first['completed_at'];
+        routeData['completed_clients'] = existing.first['completed_clients'];
+        routeData['is_synced'] = 0; // Mantener como no sincronizado
+        routeData['last_synced_at'] = null;
+      }
+    }
+
     await db.insert(
       'routes',
-      {
-        'id': route.id,
-        'mercaderista_id': route.mercaderistaId,
-        'name': route.name,
-        'scheduled_date': route.scheduledDate.toIso8601String().split('T')[0],
-        'status': route.status.value,
-        'total_clients': route.totalClients,
-        'completed_clients': route.completedClients,
-        'estimated_duration': route.estimatedDuration?.toString(),
-        'started_at': route.startedAt?.toIso8601String(),
-        'completed_at': route.completedAt?.toIso8601String(),
-        'created_at': route.createdAt.toIso8601String(),
-        'updated_at': route.updatedAt?.toIso8601String(),
-        'template_id': route.templateId,
-        'route_type_id': route.routeTypeId,
-        'notes': route.notes,
-        'sede_app': route.sedeApp,
-        'created_by': route.createdBy,
-        'route_type_name': route.routeType?.name,
-        'route_type_color': route.routeType?.color,
-        'brands_json': route.brands != null ? jsonEncode(route.brands) : null,
-        'is_synced': isSynced ? 1 : 0,
-        'last_synced_at': isSynced ? DateTime.now().toIso8601String() : null,
-      },
+      routeData,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
@@ -409,7 +433,23 @@ class DatabaseService {
   /// Guarda o actualiza un cliente de ruta localmente
   Future<void> saveRouteClient(RouteClient client, {bool isSynced = true}) async {
     final db = await database;
-    
+
+    // Si los datos vienen del servidor (isSynced=true), no sobreescribir
+    // un registro local que tenga cambios pendientes de sync (is_synced=0).
+    // Ej: mercaderista ya completó el cliente pero Supabase aún no lo tiene.
+    if (isSynced) {
+      final existing = await db.query(
+        'route_clients',
+        columns: ['is_synced'],
+        where: 'id = ?',
+        whereArgs: [client.id],
+        limit: 1,
+      );
+      if (existing.isNotEmpty && (existing.first['is_synced'] as int? ?? 1) == 0) {
+        return; // Preservar datos locales no sincronizados
+      }
+    }
+
     await db.insert(
       'route_clients',
       {

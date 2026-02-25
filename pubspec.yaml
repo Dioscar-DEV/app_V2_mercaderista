@@ -2,7 +2,7 @@ name: disbattery_trade
 description: "Aplicación móvil para gestión de rutas de mercaderistas de Disbattery"
 publish_to: 'none'
 
-version: 1.4.5+17
+version: 1.4.7+19
 
 environment:
   sdk: ^3.9.2

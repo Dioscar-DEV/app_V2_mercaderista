@@ -27,7 +27,7 @@ class OfflineFirstRouteRepository {
   final Connectivity _connectivity;
   
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
-  bool _isOnline = true;
+  bool _isOnline = false;
   bool _isSyncing = false;
 
   OfflineFirstRouteRepository({

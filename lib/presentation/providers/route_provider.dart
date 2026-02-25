@@ -312,18 +312,54 @@ class RouteExecutionNotifier extends StateNotifier<RouteExecutionState> {
       await _offlineRepository.syncPendingChanges();
 
       final data = await _onlineRepository.getRouteForOffline(routeId);
-      final route = data['route'] as AppRoute;
+      final serverRoute = data['route'] as AppRoute;
       final questions = data['questions'] as List<RouteFormQuestion>;
-      
-      // Actualizar estado con datos frescos
+
       if (mounted) {
+        // Merge: nunca degradar el estado local de un cliente a uno inferior del servidor.
+        // Esto evita que un sync parcial sobreescriba visitas ya registradas en la UI.
+        final currentRoute = state.route;
+        AppRoute mergedRoute = serverRoute;
+        if (currentRoute != null &&
+            currentRoute.clients != null &&
+            serverRoute.clients != null) {
+          final mergedClients = serverRoute.clients!.map((serverClient) {
+            final localClient = currentRoute.clients!.firstWhere(
+              (c) => c.id == serverClient.id,
+              orElse: () => serverClient,
+            );
+            if (_routeClientStatusPriority(localClient.status) >
+                _routeClientStatusPriority(serverClient.status)) {
+              return serverClient.copyWith(status: localClient.status);
+            }
+            return serverClient;
+          }).toList();
+          mergedRoute = serverRoute.copyWith(clients: mergedClients);
+        }
+
         state = state.copyWith(
-          route: route,
+          route: mergedRoute,
           questions: questions,
         );
       }
     } catch (_) {
       // Silencioso - ya tenemos datos locales
+    }
+  }
+
+  /// Prioridad de estados: mayor número = más avanzado
+  int _routeClientStatusPriority(RouteClientStatus status) {
+    switch (status) {
+      case RouteClientStatus.pending:
+        return 0;
+      case RouteClientStatus.inProgress:
+        return 1;
+      case RouteClientStatus.completed:
+        return 3;
+      case RouteClientStatus.skipped:
+        return 3;
+      case RouteClientStatus.closedTemp:
+        return 3;
     }
   }
 

@@ -581,15 +581,19 @@ class RouteRepository {
   }
 
   Future<void> _updateCompletedClientsCount(String routeId) async {
-    final completed = await _client
-        .from('route_clients')
-        .select()
-        .eq('route_id', routeId)
-        .eq('status', 'completed');
+    try {
+      final completed = await _client
+          .from('route_clients')
+          .select()
+          .eq('route_id', routeId)
+          .eq('status', 'completed');
 
-    await _client.from('routes').update({
-      'completed_clients': (completed as List).length,
-    }).eq('id', routeId);
+      await _client.from('routes').update({
+        'completed_clients': (completed as List).length,
+      }).eq('id', routeId);
+    } catch (_) {
+      // No bloquear completeClientVisit si solo falla el contador
+    }
   }
 
   // ========================
