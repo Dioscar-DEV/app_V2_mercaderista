@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../providers/reports_provider.dart';
 import '../../../../core/models/report_models.dart';
+import '../../../../core/utils/file_downloader.dart' as downloader;
 
 /// Pantalla de respuestas de formularios con exportación CSV y visor de fotos
 class FormAnswersScreen extends ConsumerWidget {
@@ -537,21 +537,9 @@ class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
     setState(() => _downloading = true);
     try {
       final url = widget.photoUrls[_currentIndex];
-      final dir = await getTemporaryDirectory();
       final fileName =
           'foto_visita_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savePath = '${dir.path}/$fileName';
-
-      final dio = Dio();
-      await dio.download(url, savePath);
-
-      if (!mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(savePath)],
-          subject: 'Foto de visita - Disbattery',
-        ),
-      );
+      await downloader.downloadFileFromUrl(url, fileName);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
