@@ -262,6 +262,7 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
 
   Widget _buildQuestionWidget(RouteFormQuestion question) {
     return Padding(
+      key: ValueKey(question.id),
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,6 +604,7 @@ class _ImpulsoVisitFormState extends ConsumerState<ImpulsoVisitForm> {
         // Agregar nuevo item
         if (items.length < maxItems)
           _DynamicListAdder(
+            key: ValueKey('adder_${question.id}'),
             types: types,
             onAdd: (type, quantity) {
               setState(() {
@@ -977,7 +979,7 @@ class _DynamicListAdder extends StatefulWidget {
   final List<String> types;
   final Function(String type, int quantity) onAdd;
 
-  const _DynamicListAdder({required this.types, required this.onAdd});
+  const _DynamicListAdder({super.key, required this.types, required this.onAdd});
 
   @override
   State<_DynamicListAdder> createState() => _DynamicListAdderState();

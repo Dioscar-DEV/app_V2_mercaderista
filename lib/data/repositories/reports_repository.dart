@@ -578,8 +578,9 @@ class ReportsRepository {
       final questionText = questionData?['question_text'] as String? ?? '';
       final questionType = questionData?['question_type'] as String? ?? '';
 
-      // Construir respuesta legible
+      // Construir respuesta legible y extraer fotos
       String answer = '';
+      List<String> photoUrls = [];
       if (a['answer_text'] != null) {
         answer = a['answer_text'] as String;
       } else if (a['answer_number'] != null) {
@@ -588,9 +589,17 @@ class ReportsRepository {
         answer = (a['answer_boolean'] as bool) ? 'Sí' : 'No';
       } else if (a['answer_json'] != null) {
         final json = a['answer_json'] as Map<String, dynamic>;
+        // Extraer fotos si existen (pueden combinarse con opciones en dynamic_list)
+        if (json.containsKey('photo_urls')) {
+          final urls = json['photo_urls'] as List<dynamic>;
+          photoUrls = urls.map((u) => u.toString()).toList();
+        }
+        // Construir texto de respuesta
         if (json.containsKey('options')) {
           final options = json['options'] as List<dynamic>;
           answer = options.join(', ');
+        } else if (photoUrls.isNotEmpty) {
+          answer = photoUrls.length == 1 ? '1 foto' : '${photoUrls.length} fotos';
         } else {
           answer = json.toString();
         }
@@ -605,6 +614,7 @@ class ReportsRepository {
         pregunta: questionText,
         tipoPregunta: questionType,
         respuesta: answer,
+        photoUrls: photoUrls,
       ));
     }
 

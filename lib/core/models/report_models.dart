@@ -256,6 +256,7 @@ class FormAnswerRow {
   final String pregunta;
   final String tipoPregunta;
   final String respuesta;
+  final List<String> photoUrls;
 
   const FormAnswerRow({
     required this.mercaderista,
@@ -266,5 +267,6 @@ class FormAnswerRow {
     required this.pregunta,
     required this.tipoPregunta,
     required this.respuesta,
+    this.photoUrls = const [],
   });
 }

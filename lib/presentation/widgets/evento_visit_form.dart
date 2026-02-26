@@ -145,6 +145,7 @@ class _EventoVisitFormState extends ConsumerState<EventoVisitForm> {
 
   Widget _buildQuestionWidget(RouteFormQuestion question) {
     return Column(
+      key: ValueKey(question.id),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -338,6 +339,7 @@ class _EventoVisitFormState extends ConsumerState<EventoVisitForm> {
         ],
         if (items.length < maxItems)
           _DynamicListAdder(
+            key: ValueKey('adder_${question.id}'),
             types: types,
             onAdd: (type, quantity) {
               setState(() {
@@ -626,7 +628,7 @@ class _EventoVisitFormState extends ConsumerState<EventoVisitForm> {
 class _DynamicListAdder extends StatefulWidget {
   final List<String> types;
   final Function(String type, int quantity) onAdd;
-  const _DynamicListAdder({required this.types, required this.onAdd});
+  const _DynamicListAdder({super.key, required this.types, required this.onAdd});
 
   @override
   State<_DynamicListAdder> createState() => _DynamicListAdderState();

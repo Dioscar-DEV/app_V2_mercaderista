@@ -240,6 +240,7 @@ class _MerchandisingVisitFormState
 
   Widget _buildQuestionWidget(RouteFormQuestion question) {
     return Padding(
+      key: ValueKey(question.id),
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +339,7 @@ class _MerchandisingVisitFormState
         ),
         if (value) ...[
           const SizedBox(height: 12),
-          _buildPhotoCapture(question.id, photos, maxPhotos: 1),
+          _buildPhotoCapture(question.id, photos, maxPhotos: question.maxPhotos),
         ],
       ],
     );
@@ -488,6 +489,7 @@ class _MerchandisingVisitFormState
 
         // Agregar nuevo item
         if (items.length < maxItems) _DynamicListAdder(
+          key: ValueKey('adder_${question.id}'),
           types: types,
           onAdd: (type, quantity) {
             setState(() {
@@ -517,76 +519,121 @@ class _MerchandisingVisitFormState
 
   Widget _buildPhotoCapture(String questionId, List<File> photos,
       {int maxPhotos = 1}) {
+    // Modo foto única (comportamiento original)
+    if (maxPhotos <= 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (photos.isEmpty)
+            OutlinedButton.icon(
+              onPressed: () => _takePhoto(questionId),
+              icon: const Icon(Icons.camera_alt, size: 18),
+              label: const Text('Tomar foto'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue[700],
+                side: BorderSide(color: Colors.blue[300]!),
+              ),
+            )
+          else
+            Row(
+              children: [
+                _buildPhotoThumbnail(questionId, 0, photos.first),
+                const SizedBox(width: 12),
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                const SizedBox(width: 4),
+                const Text('Foto capturada',
+                    style: TextStyle(color: Colors.green, fontSize: 13)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _takePhoto(questionId),
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Cambiar', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+        ],
+      );
+    }
+
+    // Modo múltiples fotos
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (photos.isEmpty)
+        if (photos.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (int i = 0; i < photos.length; i++)
+                _buildPhotoThumbnail(questionId, i, photos[i]),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${photos.length} de $maxPhotos fotos',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (photos.length < maxPhotos)
           OutlinedButton.icon(
-            onPressed: () => _takePhoto(questionId),
+            onPressed: () => _takePhoto(questionId, append: true),
             icon: const Icon(Icons.camera_alt, size: 18),
-            label: const Text('Tomar foto'),
+            label: Text(photos.isEmpty ? 'Tomar foto' : 'Agregar otra foto'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.blue[700],
               side: BorderSide(color: Colors.blue[300]!),
             ),
-          )
-        else
-          Row(
-            children: [
-              // Preview de la foto
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  image: DecorationImage(
-                    image: FileImage(photos.first),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _questionPhotos[questionId]?.clear();
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close,
-                              size: 12, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Icon(Icons.check_circle, color: Colors.green, size: 20),
-              const SizedBox(width: 4),
-              const Text('Foto capturada',
-                  style: TextStyle(color: Colors.green, fontSize: 13)),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => _takePhoto(questionId),
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Cambiar', style: TextStyle(fontSize: 12)),
-              ),
-            ],
           ),
+        if (photos.length >= maxPhotos)
+          Text('Máximo $maxPhotos fotos alcanzado',
+              style: TextStyle(color: Colors.orange[700], fontSize: 12)),
       ],
     );
   }
 
-  Future<void> _takePhoto(String questionId) async {
+  Widget _buildPhotoThumbnail(String questionId, int index, File photo) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        image: DecorationImage(
+          image: FileImage(photo),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _questionPhotos[questionId]?.removeAt(index);
+                  if (_questionPhotos[questionId]?.isEmpty ?? false) {
+                    _questionPhotos.remove(questionId);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close,
+                    size: 12, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _takePhoto(String questionId, {bool append = false}) async {
     try {
       final pickedFile = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -600,7 +647,12 @@ class _MerchandisingVisitFormState
       final compressedFile = await _compressImage(File(pickedFile.path));
 
       setState(() {
-        _questionPhotos[questionId] = [compressedFile];
+        if (append) {
+          _questionPhotos[questionId] ??= [];
+          _questionPhotos[questionId]!.add(compressedFile);
+        } else {
+          _questionPhotos[questionId] = [compressedFile];
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -819,7 +871,7 @@ class _DynamicListAdder extends StatefulWidget {
   final List<String> types;
   final Function(String type, int quantity) onAdd;
 
-  const _DynamicListAdder({required this.types, required this.onAdd});
+  const _DynamicListAdder({super.key, required this.types, required this.onAdd});
 
   @override
   State<_DynamicListAdder> createState() => _DynamicListAdderState();
