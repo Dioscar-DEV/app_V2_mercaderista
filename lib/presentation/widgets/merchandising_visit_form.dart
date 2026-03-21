@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -760,6 +761,8 @@ class _MerchandisingVisitFormState
       final allPhotoUrls = <String>[];
       final userId = SupabaseConfig.currentUser?.id;
 
+      int failedPhotos = 0;
+
       for (final entry in _questionPhotos.entries) {
         final qId = entry.key;
         final files = entry.value;
@@ -772,7 +775,7 @@ class _MerchandisingVisitFormState
             final fileName =
                 '${userId ?? "unknown"}/merch_${timestamp}_${qId.substring(qId.length - 4)}_$i.jpg';
 
-            final url = await SupabaseConfig.uploadFile(
+            final url = await SupabaseConfig.uploadFileWithRetry(
               SupabaseConfig.visitPhotosBucket,
               fileName,
               bytes,
@@ -780,11 +783,40 @@ class _MerchandisingVisitFormState
             urls.add(url);
             allPhotoUrls.add(url);
           } catch (e) {
-            urls.add('local:${files[i].path}');
-            allPhotoUrls.add('local:${files[i].path}');
+            // Intentar con compresión más agresiva
+            try {
+              final compressed = await _compressImage(files[i]);
+              final compBytes = await compressed.readAsBytes();
+              final finalBytes = compBytes.length > 1024 * 1024
+                  ? await FlutterImageCompress.compressWithList(compBytes, quality: 40, minWidth: 600, minHeight: 600)
+                  : compBytes;
+              final timestamp = DateTime.now().millisecondsSinceEpoch;
+              final fileName =
+                  '${userId ?? "unknown"}/merch_${timestamp}_${qId.substring(qId.length - 4)}_$i.jpg';
+              final url = await SupabaseConfig.uploadFile(
+                SupabaseConfig.visitPhotosBucket,
+                fileName,
+                Uint8List.fromList(finalBytes),
+              );
+              urls.add(url);
+              allPhotoUrls.add(url);
+            } catch (_) {
+              failedPhotos++;
+              debugPrint('Photo upload failed permanently for question $qId photo $i');
+            }
           }
         }
         _uploadedPhotoUrls[qId] = urls;
+      }
+
+      if (failedPhotos > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$failedPhotos foto(s) no se pudieron subir. Verifica tu conexión.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
 
       // Construir answers

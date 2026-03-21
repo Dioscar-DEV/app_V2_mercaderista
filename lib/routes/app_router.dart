@@ -25,6 +25,10 @@ import '../presentation/screens/admin/reports/client_coverage_report_screen.dart
 import '../presentation/screens/admin/reports/routes_report_screen.dart';
 import '../presentation/screens/admin/reports/events_report_screen.dart';
 import '../presentation/screens/admin/reports/form_answers_screen.dart';
+import '../presentation/screens/admin/material_pop/material_pop_screen.dart';
+import '../presentation/screens/admin/material_pop/register_movement_screen.dart';
+import '../presentation/screens/admin/material_pop/edit_material_screen.dart';
+import '../core/models/pop_material.dart';
 
 /// Configuración de rutas de la aplicación
 class AppRouter {
@@ -187,6 +191,30 @@ class AppRouter {
             builder: (context, state) {
               final eventId = state.pathParameters['id']!;
               return CreateEditEventScreen(eventId: eventId);
+            },
+          ),
+          // Material POP
+          GoRoute(
+            path: 'material-pop',
+            name: 'material_pop',
+            builder: (context, state) => const MaterialPopScreen(),
+          ),
+          GoRoute(
+            path: 'material-pop/registro',
+            name: 'material_pop_registro',
+            builder: (context, state) => const RegisterMovementScreen(),
+          ),
+          GoRoute(
+            path: 'material-pop/nuevo',
+            name: 'material_pop_nuevo',
+            builder: (context, state) => const EditMaterialScreen(),
+          ),
+          GoRoute(
+            path: 'material-pop/editar',
+            name: 'material_pop_editar',
+            builder: (context, state) {
+              final material = state.extra as PopMaterial;
+              return EditMaterialScreen(material: material);
             },
           ),
         ],

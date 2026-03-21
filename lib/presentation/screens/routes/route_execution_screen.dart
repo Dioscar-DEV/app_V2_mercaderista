@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -1382,21 +1384,43 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     );
 
     if (confirmed == true) {
-      // 3. Subir foto a Supabase Storage
+      // 3. Subir foto a Supabase Storage con reintentos
       String? photoUrl;
       try {
         final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
         final fileName = 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final storagePath = '$userId/$fileName';
         final bytes = await photoFile.readAsBytes();
-        photoUrl = await SupabaseConfig.uploadFile(
+        photoUrl = await SupabaseConfig.uploadFileWithRetry(
           SupabaseConfig.visitPhotosBucket,
           storagePath,
           bytes,
         );
       } catch (e) {
-        // Si falla la subida, guardar path local para sync posterior
-        photoUrl = 'local:${photoFile.path}';
+        // Intentar con compresión más agresiva
+        try {
+          final compressed = await _compressClosurePhoto(photoFile);
+          final compBytes = await compressed.readAsBytes();
+          final finalBytes = compBytes.length > 1024 * 1024
+              ? await FlutterImageCompress.compressWithList(compBytes, quality: 40, minWidth: 600, minHeight: 600)
+              : compBytes;
+          final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
+          final fileName = 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          photoUrl = await SupabaseConfig.uploadFile(
+            SupabaseConfig.visitPhotosBucket,
+            '$userId/$fileName',
+            Uint8List.fromList(finalBytes),
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No se pudo subir la foto de cierre. Verifica tu conexión.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
       }
 
       await ref
@@ -1529,20 +1553,42 @@ class _RouteExecutionScreenState extends ConsumerState<RouteExecutionScreen> {
     );
 
     if (confirmed == true) {
-      // 3. Subir foto a Supabase Storage
+      // 3. Subir foto a Supabase Storage con reintentos
       String? photoUrl;
       try {
         final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
-        final fileName = 'closure_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final fileName = 'closure_perm_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final storagePath = '$userId/$fileName';
         final bytes = await photoFile.readAsBytes();
-        photoUrl = await SupabaseConfig.uploadFile(
+        photoUrl = await SupabaseConfig.uploadFileWithRetry(
           SupabaseConfig.visitPhotosBucket,
           storagePath,
           bytes,
         );
       } catch (e) {
-        photoUrl = 'local:${photoFile.path}';
+        try {
+          final compressed = await _compressClosurePhoto(photoFile);
+          final compBytes = await compressed.readAsBytes();
+          final finalBytes = compBytes.length > 1024 * 1024
+              ? await FlutterImageCompress.compressWithList(compBytes, quality: 40, minWidth: 600, minHeight: 600)
+              : compBytes;
+          final userId = SupabaseConfig.currentUser?.id ?? 'unknown';
+          final fileName = 'closure_perm_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          photoUrl = await SupabaseConfig.uploadFile(
+            SupabaseConfig.visitPhotosBucket,
+            '$userId/$fileName',
+            Uint8List.fromList(finalBytes),
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No se pudo subir la foto de cierre. Verifica tu conexión.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
       }
 
       await ref

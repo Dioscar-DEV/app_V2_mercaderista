@@ -61,6 +61,26 @@ class SupabaseConfig {
     return getPublicUrl(bucket, path);
   }
 
+  /// Sube un archivo con reintentos automáticos (hasta 3 intentos)
+  static Future<String> uploadFileWithRetry(
+    String bucket,
+    String path,
+    Uint8List fileBytes, {
+    String contentType = 'image/jpeg',
+    int maxRetries = 3,
+  }) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await uploadFile(bucket, path, fileBytes, contentType: contentType);
+      } catch (e) {
+        if (attempt == maxRetries) rethrow;
+        // Espera progresiva: 1s, 2s, 3s
+        await Future.delayed(Duration(seconds: attempt));
+      }
+    }
+    throw Exception('Upload failed after $maxRetries attempts');
+  }
+
   /// Elimina un archivo de Storage
   static Future<void> deleteFile(String bucket, String path) async {
     await client.storage.from(bucket).remove([path]);

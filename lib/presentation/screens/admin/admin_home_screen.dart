@@ -264,6 +264,13 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       },
                     ),
                     _ModuleCard(
+                      icon: Icons.inventory_2,
+                      title: 'Material POP',
+                      subtitle: 'Ingreso y egreso',
+                      color: Colors.amber[700]!,
+                      onTap: () => context.push('/admin/material-pop'),
+                    ),
+                    _ModuleCard(
                       icon: Icons.bar_chart,
                       title: 'Reportes',
                       subtitle: 'Analytics y reportes',

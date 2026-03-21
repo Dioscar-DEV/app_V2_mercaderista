@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -492,12 +493,14 @@ class _RouteVisitFormState extends ConsumerState<RouteVisitForm> {
     return file;
   }
 
-  /// Sube fotos a Supabase Storage y retorna las URLs
+  /// Sube fotos a Supabase Storage con reintentos y retorna las URLs
   Future<List<String>> _uploadPhotos() async {
     final uploadedUrls = <String>[];
 
     final userId = SupabaseConfig.currentUser?.id;
     if (userId == null) return uploadedUrls;
+
+    int failedCount = 0;
 
     for (int i = 0; i < _localPhotos.length; i++) {
       try {
@@ -506,17 +509,46 @@ class _RouteVisitFormState extends ConsumerState<RouteVisitForm> {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final fileName = '$userId/visit_${timestamp}_$i.jpg';
 
-        final url = await SupabaseConfig.uploadFile(
+        final url = await SupabaseConfig.uploadFileWithRetry(
           SupabaseConfig.visitPhotosBucket,
           fileName,
           bytes,
         );
         uploadedUrls.add(url);
       } catch (e) {
-        // Si falla una foto, continuar con las demás
-        // Guardar path local como fallback para sync posterior
-        uploadedUrls.add('local:${_localPhotos[i].path}');
+        failedCount++;
+        // Comprimir más agresivamente e intentar una vez más
+        try {
+          final compressed = await _compressImage(_localPhotos[i]);
+          final bytes = await compressed.readAsBytes();
+          // Reducir aún más si es muy grande (>1MB)
+          final finalBytes = bytes.length > 1024 * 1024
+              ? await FlutterImageCompress.compressWithList(bytes, quality: 40, minWidth: 600, minHeight: 600)
+              : bytes;
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = '$userId/visit_${timestamp}_$i.jpg';
+          final url = await SupabaseConfig.uploadFile(
+            SupabaseConfig.visitPhotosBucket,
+            fileName,
+            Uint8List.fromList(finalBytes),
+          );
+          uploadedUrls.add(url);
+          failedCount--;
+        } catch (_) {
+          // Último recurso: omitir la foto pero NO guardar local:
+          debugPrint('Photo upload failed permanently for photo $i');
+        }
       }
+    }
+
+    if (failedCount > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$failedCount foto(s) no se pudieron subir. Verifica tu conexión.'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
 
     return uploadedUrls;
