@@ -385,6 +385,9 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
         return _RouteCard(
           route: route,
           onTap: () => _openRouteDetail(route),
+          onEdit: () => context.push('/admin/routes/${route.id}/edit'),
+          onChangeDate: () => _showChangeDateDialog(route),
+          onCancel: () => _showCancelDialog(route),
         );
       },
     );
@@ -480,6 +483,103 @@ class _RouteCalendarScreenState extends ConsumerState<RouteCalendarScreen> {
   void _openRouteDetail(AppRoute route) {
     context.push('/admin/routes/${route.id}');
   }
+
+  Future<void> _showChangeDateDialog(AppRoute route) async {
+    final newDate = await showDatePicker(
+      context: context,
+      initialDate: route.scheduledDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Nueva fecha para "${route.name}"',
+    );
+
+    if (newDate != null && mounted) {
+      try {
+        final repo = ref.read(routeRepositoryProvider);
+        await repo.updateRoute(route.copyWith(scheduledDate: newDate));
+        ref.invalidate(routesForWeekProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Fecha cambiada al ${newDate.day}/${newDate.month}/${newDate.year}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showCancelDialog(AppRoute route) async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancelar ruta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Cancelar "${route.name}"?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Motivo de cancelación *',
+                border: OutlineInputBorder(),
+                hintText: 'Ej: Error de fecha, duplicada, etc.',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('El motivo es obligatorio'), backgroundColor: Colors.orange),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Cancelar ruta', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final repo = ref.read(routeRepositoryProvider);
+        await repo.cancelRoute(routeId: route.id, reason: reasonController.text.trim());
+        ref.invalidate(routesForWeekProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ruta cancelada'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+    reasonController.dispose();
+  }
 }
 
 class _StatItem extends StatelessWidget {
@@ -523,14 +623,21 @@ class _StatItem extends StatelessWidget {
 class _RouteCard extends StatelessWidget {
   final AppRoute route;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onChangeDate;
+  final VoidCallback? onCancel;
 
   const _RouteCard({
     required this.route,
     required this.onTap,
+    this.onEdit,
+    this.onChangeDate,
+    this.onCancel,
   });
 
   @override
   Widget build(BuildContext context) {
+    final canManage = route.status == RouteStatus.planned;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -554,6 +661,47 @@ class _RouteCard extends StatelessWidget {
                     ),
                   ),
                   _buildStatusChip(route.status),
+                  if (canManage) ...[
+                    const SizedBox(width: 4),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onSelected: (v) {
+                        switch (v) {
+                          case 'edit': onEdit?.call();
+                          case 'date': onChangeDate?.call();
+                          case 'cancel': onCancel?.call();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(children: [
+                            Icon(Icons.edit, size: 18, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('Editar ruta'),
+                          ]),
+                        ),
+                        const PopupMenuItem(
+                          value: 'date',
+                          child: Row(children: [
+                            Icon(Icons.calendar_month, size: 18, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Text('Cambiar fecha'),
+                          ]),
+                        ),
+                        const PopupMenuItem(
+                          value: 'cancel',
+                          child: Row(children: [
+                            Icon(Icons.cancel, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Cancelar ruta'),
+                          ]),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),

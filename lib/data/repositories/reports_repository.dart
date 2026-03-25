@@ -537,11 +537,17 @@ class ReportsRepository {
       };
     }
 
-    // Visitas de esas rutas
-    final List<dynamic> visitsData = await _client
-        .from('route_visits')
-        .select('id, route_id, mercaderista_id, client_co_cli, visited_at, users!route_visits_mercaderista_id_fkey(full_name), clients(cli_des)')
-        .inFilter('route_id', routeIds);
+    // Visitas de esas rutas (en lotes para evitar URLs muy largas)
+    final List<dynamic> visitsData = [];
+    const batchSize = 50;
+    for (var i = 0; i < routeIds.length; i += batchSize) {
+      final batch = routeIds.sublist(i, (i + batchSize).clamp(0, routeIds.length));
+      final batchData = await _client
+          .from('route_visits')
+          .select('id, route_id, mercaderista_id, client_co_cli, visited_at, users!route_visits_mercaderista_id_fkey(full_name), clients(cli_des)')
+          .inFilter('route_id', batch);
+      visitsData.addAll(batchData as List);
+    }
 
     final visitIds = visitsData.map((v) => v['id'] as String).toList();
     if (visitIds.isEmpty) return [];
@@ -559,11 +565,16 @@ class ReportsRepository {
       };
     }
 
-    // Respuestas con preguntas
-    final List<dynamic> answersData = await _client
-        .from('route_visit_answers')
-        .select('visit_id, answer_text, answer_number, answer_boolean, answer_json, route_form_questions(question_text, question_type)')
-        .inFilter('visit_id', visitIds);
+    // Respuestas con preguntas (en lotes)
+    final List<dynamic> answersData = [];
+    for (var i = 0; i < visitIds.length; i += batchSize) {
+      final batch = visitIds.sublist(i, (i + batchSize).clamp(0, visitIds.length));
+      final batchData = await _client
+          .from('route_visit_answers')
+          .select('visit_id, answer_text, answer_number, answer_boolean, answer_json, route_form_questions(question_text, question_type)')
+          .inFilter('visit_id', batch);
+      answersData.addAll(batchData as List);
+    }
 
     final result = <FormAnswerRow>[];
     for (final a in answersData) {

@@ -40,16 +40,16 @@ enum Region {
 /// Cada sede pertenece a una región y cubre estados específicos de Venezuela
 enum Sede {
   // ZONA METROPOLITANA Y CENTRO
-  grupoDisbattery('grupo_disbattery', 'Grupo Disbattery', Region.centroCapital),
+  grupoDisbattery('grupo_disbattery', 'Centro-Capital', Region.centroCapital),
 
   // ZONA ORIENTE
-  oceanoPacifico('oceano_pacifico', 'Dislub Oriente', Region.oriente),
+  oceanoPacifico('oceano_pacifico', 'Oriente', Region.oriente),
 
   // ZONA CENTRO
-  blitz2000('blitz_2000', 'Blitz 2000', Region.centroLosLlanos),
+  blitz2000('blitz_2000', 'Centro-Llanos', Region.centroLosLlanos),
 
   // ZONA OCCIDENTE
-  grupoVictoria('grupo_victoria', 'Grupo Victoria', Region.occidente);
+  grupoVictoria('grupo_victoria', 'Occidente', Region.occidente);
 
   const Sede(this.value, this.displayName, this.region);
 

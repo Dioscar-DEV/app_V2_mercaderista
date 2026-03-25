@@ -69,7 +69,7 @@ class AppConstants {
 
   // Sedes/Sucursales de Disbattery
   static const Map<String, List<String>> sedes = {
-    'GRUPO DISBATTERY': [
+    'CENTRO-CAPITAL': [
       'Caracas',
       'Falcon',
       'Aragua',
@@ -78,18 +78,18 @@ class AppConstants {
       'Portuguesa',
       'Yaracuy',
     ],
-    'OCEANO PACIFICO': [
+    'ORIENTE': [
       'El Tigre',
       'Puerto La Cruz',
       'Maturin',
       'Puerto Ordaz',
       'Margarita',
     ],
-    'BLITZ 2000': [
+    'CENTRO-LLANOS': [
       'Valencia',
       'Calabozo',
     ],
-    'GRUPO VICTORIA': [
+    'OCCIDENTE': [
       'San Cristobal',
       'Maracaibo',
       'Valera',
@@ -101,7 +101,7 @@ class AppConstants {
 
   // Todas las sucursales (lista plana)
   static const List<String> allSucursales = [
-    // GRUPO DISBATTERY
+    // CENTRO-CAPITAL
     'Caracas',
     'Falcon',
     'Aragua',
@@ -109,16 +109,16 @@ class AppConstants {
     'Miranda',
     'Portuguesa',
     'Yaracuy',
-    // OCEANO PACIFICO
+    // ORIENTE
     'El Tigre',
     'Puerto La Cruz',
     'Maturin',
     'Puerto Ordaz',
     'Margarita',
-    // BLITZ 2000
+    // CENTRO-LLANOS
     'Valencia',
     'Calabozo',
-    // GRUPO VICTORIA
+    // OCCIDENTE
     'San Cristobal',
     'Maracaibo',
     'Valera',

@@ -8,6 +8,22 @@ Formato: [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH+BUILD`
 
 ---
 
+## [1.6.0+23] - 2026-03-25
+
+### Nuevas funcionalidades
+- **Pantalla de Perfil de Usuario**: Accesible desde el icono de usuario en el dashboard. Muestra avatar con carga de foto, informacion personal, metricas por rol (mercaderista vs supervisor/owner) y gestion de cuenta
+- **Crear Sucursales desde Gestion de Clientes**: Boton "Crear Sucursal" en el detalle del cliente. Auto-genera codigo con sufijo incremental (CLI00616-1, -2, etc.)
+- **Tab de Visitas mejorado**: Carga datos reales de route_visits. Muestra mercaderista, nombre de ruta, thumbnails de fotos clickeables
+- **Rol Owner global (Admin Master)**: Usuarios con sede NULL tienen acceso total a todas las sedes
+- **Mercaderista nacional**: Mercaderistas con sede NULL pueden ser asignados a rutas de cualquier sede
+
+### Mejoras
+- **Sedes renombradas**: Grupo Disbattery → Centro-Capital, Dislub Oriente → Oriente, Blitz 2000 → Centro-Llanos, Grupo Victoria → Occidente
+- **Fix reportes con muchas visitas**: Queries por lotes (batches de 50) para evitar URLs largas
+- **Nombres geograficos en reportes y CSV exportado**
+
+---
+
 ## [1.4.4+16] - 2026-02-22
 
 ### Correcciones criticas

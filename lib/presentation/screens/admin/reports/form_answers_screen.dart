@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../providers/reports_provider.dart';
 import '../../../../core/models/report_models.dart';
+import '../../../../core/enums/sede.dart';
 import '../../../../core/utils/file_downloader.dart' as downloader;
 
 /// Pantalla de respuestas de formularios con exportación CSV y visor de fotos
@@ -254,7 +255,7 @@ class FormAnswersScreen extends ConsumerWidget {
             '${a.visitedAt.hour.toString().padLeft(2, '0')}:${a.visitedAt.minute.toString().padLeft(2, '0')}';
         String esc(String s) => '"${s.replaceAll('"', '""')}"';
         buffer.writeln(
-          '${esc(a.mercaderista)},${esc(a.cliente)},${esc(a.tipoRuta)},${esc(a.sede)},$date,$time,${esc(a.pregunta)},${esc(a.tipoPregunta)},${esc(a.respuesta)}',
+          '${esc(a.mercaderista)},${esc(a.cliente)},${esc(a.tipoRuta)},${esc(Sede.tryFromString(a.sede)?.displayName ?? a.sede)},$date,$time,${esc(a.pregunta)},${esc(a.tipoPregunta)},${esc(a.respuesta)}',
         );
       }
 

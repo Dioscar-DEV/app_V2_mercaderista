@@ -153,9 +153,7 @@ class _MercaderistaHomeScreenState extends ConsumerState<MercaderistaHomeScreen>
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () {
-              // TODO: Navegar a perfil
-            },
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),

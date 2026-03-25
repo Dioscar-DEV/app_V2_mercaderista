@@ -112,11 +112,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           _buildNotesTab(context, client),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addToRoute(context, client),
-        icon: const Icon(Icons.route),
-        label: const Text('Generar Ruta'),
-      ),
+      floatingActionButton: !client.isSucursal
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateSucursalDialog(context, client),
+              icon: const Icon(Icons.add_business),
+              label: const Text('Crear Sucursal'),
+            )
+          : null,
     );
   }
 
@@ -504,19 +506,138 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     return content;
   }
 
-  Future<void> _addToRoute(BuildContext context, Client client) async {
-    // TODO: Implementar cuando esté el módulo de rutas
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Cliente "${client.cliDes}" agregado a la ruta'),
-        action: SnackBarAction(
-          label: 'Ver Ruta',
-          onPressed: () {
-            // TODO: Navegar al módulo de rutas
-          },
+  Future<void> _showCreateSucursalDialog(BuildContext context, Client client) async {
+    final formKey = GlobalKey<FormState>();
+    final direccionController = TextEditingController();
+    final ciudadController = TextEditingController(text: client.ciudad ?? '');
+    final telefonoController = TextEditingController(text: client.telefonos ?? '');
+    final responsableController = TextEditingController(text: client.respons ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Crear Sucursal'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Info del cliente padre
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.store, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${client.coCli} - ${client.cliDes}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: direccionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección de la sucursal *',
+                    prefixIcon: Icon(Icons.place),
+                    hintText: 'Dirección diferente a la sede principal',
+                  ),
+                  maxLines: 2,
+                  validator: (v) => v?.trim().isEmpty == true ? 'La dirección es obligatoria' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: ciudadController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ciudad',
+                    prefixIcon: Icon(Icons.location_city),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: telefonoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: responsableController,
+                  decoration: const InputDecoration(
+                    labelText: 'Responsable/Contacto',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              if (formKey.currentState?.validate() == true) {
+                Navigator.pop(ctx, true);
+              }
+            },
+            icon: const Icon(Icons.add_business),
+            label: const Text('Crear'),
+          ),
+        ],
       ),
     );
+
+    if (result == true && mounted) {
+      try {
+        final repository = ref.read(clientRepositoryProvider);
+        final sucursal = await repository.createSucursal(
+          parentCoCli: client.coCli,
+          cliDes: client.cliDes,
+          sedeApp: client.sedeApp ?? 'grupo_disbattery',
+          direc1: direccionController.text,
+          ciudad: ciudadController.text.isNotEmpty ? ciudadController.text : null,
+          telefonos: telefonoController.text.isNotEmpty ? telefonoController.text : null,
+          respons: responsableController.text.isNotEmpty ? responsableController.text : null,
+          rif: client.rif,
+        );
+
+        ref.invalidate(clientsProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sucursal ${sucursal.coCli} creada exitosamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al crear sucursal: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _launchPhone(String phone) async {
@@ -736,7 +857,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   }
 }
 
-/// Tarjeta de visita
+/// Tarjeta de visita mejorada
 class _VisitCard extends StatelessWidget {
   final ClientVisit visit;
 
@@ -744,6 +865,10 @@ class _VisitCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final validPhotos = visit.photos
+        ?.where((p) => p.startsWith('http'))
+        .toList() ?? [];
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -751,47 +876,114 @@ class _VisitCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Fecha y mercaderista
             Row(
               children: [
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 20,
-                ),
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   _formatDateTime(visit.visitedAt),
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
+                const Spacer(),
+                if (validPhotos.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.photo_camera, size: 14, color: Colors.blue),
+                        const SizedBox(width: 4),
+                        Text('${validPhotos.length}', style: const TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
               ],
             ),
+            // Mercaderista
+            if (visit.mercaderistaNombre != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(Icons.person, size: 16, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(width: 4),
+                  Text(
+                    visit.mercaderistaNombre!,
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.outline),
+                  ),
+                ],
+              ),
+            ],
+            // Ruta
+            if (visit.rutaNombre != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.route, size: 16, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      visit.rutaNombre!,
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            // Fotos thumbnails
+            if (validPhotos.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 60,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: validPhotos.length > 4 ? 4 : validPhotos.length,
+                  itemBuilder: (context, index) {
+                    if (index == 3 && validPhotos.length > 4) {
+                      return Container(
+                        width: 60,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Center(
+                          child: Text('+${validPhotos.length - 3}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      );
+                    }
+                    return GestureDetector(
+                      onTap: () => _showFullPhoto(context, validPhotos[index]),
+                      child: Container(
+                        width: 60,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(6),
+                          image: DecorationImage(
+                            image: NetworkImage(validPhotos[index]),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            // Notas
             if (visit.notes != null && visit.notes!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 visit.notes!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-              ),
-            ],
-            if (visit.latitude != null && visit.longitude != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${visit.latitude!.toStringAsFixed(4)}, ${visit.longitude!.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                ],
+                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.outline),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],
@@ -800,7 +992,33 @@ class _VisitCard extends StatelessWidget {
     );
   }
 
+  void _showFullPhoto(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: const Text('Foto de visita'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            InteractiveViewer(
+              child: Image.network(url, fit: BoxFit.contain),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _formatDateTime(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

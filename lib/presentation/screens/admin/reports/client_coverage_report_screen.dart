@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../providers/reports_provider.dart';
 import '../../../../core/models/report_models.dart';
+import '../../../../core/enums/sede.dart';
 
 /// Pantalla de reporte de cobertura de clientes
 class ClientCoverageReportScreen extends ConsumerWidget {
@@ -278,8 +279,9 @@ class ClientCoverageReportScreen extends ConsumerWidget {
                       ? Colors.amber
                       : Colors.red;
 
+              final sedeDisplay = Sede.tryFromString(sede.sede)?.displayName ?? sede.sede;
               return ListTile(
-                title: Text(sede.sede),
+                title: Text(sedeDisplay),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: LinearProgressIndicator(
@@ -363,7 +365,7 @@ class ClientCoverageReportScreen extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 subtitle: Text(
-                  'Sede: ${client.sede} \u00b7 $lastVisitText',
+                  'Sede: ${Sede.tryFromString(client.sede)?.displayName ?? client.sede} \u00b7 $lastVisitText',
                   style: theme.textTheme.bodySmall,
                 ),
               );

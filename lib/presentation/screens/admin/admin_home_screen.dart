@@ -105,9 +105,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () {
-              // TODO: Navegar a perfil
-            },
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
@@ -207,17 +205,19 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 const SizedBox(height: 8),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    // Adapt aspect ratio to available width
-                    final cardWidth = (constraints.maxWidth - 8) / 2;
-                    // Target ~130px height for module cards
-                    final aspectRatio = cardWidth / 130;
+                    final width = constraints.maxWidth;
+                    // Responsive: 2 cols móvil, 3 cols tablet, 4 cols desktop
+                    final crossAxisCount = width > 900 ? 4 : width > 600 ? 3 : 2;
+                    final cardWidth = (width - (crossAxisCount - 1) * 8) / crossAxisCount;
+                    final targetHeight = width > 600 ? 100.0 : 130.0;
+                    final aspectRatio = cardWidth / targetHeight;
                     return GridView.count(
-                  crossAxisCount: 2,
+                  crossAxisCount: crossAxisCount,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
-                  childAspectRatio: aspectRatio.clamp(0.9, 1.5),
+                  childAspectRatio: aspectRatio.clamp(0.9, 2.5),
                   children: [
                     _ModuleCard(
                       icon: Icons.route,
@@ -488,21 +488,25 @@ class _ModuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 600;
     return Card(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: isWide ? 8.0 : 12.0,
+            vertical: isWide ? 8.0 : 10.0,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 36),
-              const SizedBox(height: 6),
+              Icon(icon, color: color, size: isWide ? 32 : 36),
+              SizedBox(height: isWide ? 4 : 6),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 13,
+                style: TextStyle(
+                  fontSize: isWide ? 12 : 13,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -513,7 +517,7 @@ class _ModuleCard extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: isWide ? 10 : 11,
                   color: Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,

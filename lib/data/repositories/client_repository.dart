@@ -191,6 +191,48 @@ class ClientRepository {
     return Client.fromJson(response);
   }
 
+  /// Crea una sucursal de un cliente existente
+  Future<Client> createSucursal({
+    required String parentCoCli,
+    required String cliDes,
+    required String sedeApp,
+    String? direc1,
+    String? ciudad,
+    String? telefonos,
+    String? respons,
+    String? rif,
+  }) async {
+    // Buscar el siguiente número de sucursal disponible
+    final existing = await _client
+        .from('clients')
+        .select('co_cli')
+        .like('co_cli', '$parentCoCli-%')
+        .order('co_cli', ascending: false)
+        .limit(1);
+
+    int nextNum = 1;
+    if ((existing as List).isNotEmpty) {
+      final lastCode = existing[0]['co_cli'] as String;
+      final match = RegExp(r'-(\d+)$').firstMatch(lastCode);
+      if (match != null) {
+        nextNum = (int.tryParse(match.group(1)!) ?? 0) + 1;
+      }
+    }
+
+    final sucursalCode = '$parentCoCli-$nextNum';
+
+    return createClient(
+      coCli: sucursalCode,
+      cliDes: cliDes,
+      sedeApp: sedeApp,
+      direc1: direc1,
+      ciudad: ciudad,
+      telefonos: telefonos,
+      respons: respons,
+      rif: rif,
+    );
+  }
+
   /// Actualiza un cliente existente
   Future<Client> updateClient({
     required String coCli,
@@ -465,18 +507,37 @@ class ClientRepository {
 
   /// Obtiene el historial de visitas de un cliente
   Future<List<ClientVisit>> getClientVisits(String coCli, {int? limit}) async {
+    // Usar route_visits que tiene la data real de visitas
     var query = _client
-        .from('client_visits')
-        .select()
+        .from('route_visits')
+        .select('id, visited_at, client_co_cli, notes, latitude, longitude, photos, mercaderista_id, route_id, users!route_visits_mercaderista_id_fkey(full_name), routes!route_visits_route_id_fkey(name)')
         .eq('client_co_cli', coCli)
         .order('visited_at', ascending: false);
-    
+
     if (limit != null) {
       query = query.limit(limit);
     }
 
     final response = await query;
-    return (response as List).map((json) => ClientVisit.fromJson(json)).toList();
+    return (response as List).map((json) {
+      // Mapear route_visits al formato ClientVisit
+      final userData = json['users'] as Map<String, dynamic>?;
+      final routeData = json['routes'] as Map<String, dynamic>?;
+      return ClientVisit(
+        id: json['id'] as String,
+        clientCoCli: json['client_co_cli'] as String,
+        mercaderistaId: json['mercaderista_id'] as String? ?? '',
+        mercaderistaNombre: userData?['full_name'] as String?,
+        rutaNombre: routeData?['name'] as String?,
+        visitedAt: DateTime.parse(json['visited_at'] as String),
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        notes: json['notes'] as String?,
+        photos: json['photos'] != null
+          ? (json['photos'] as List).map((e) => e.toString()).toList()
+          : null,
+      );
+    }).toList();
   }
 
   /// Obtiene las visitas de un mercaderista

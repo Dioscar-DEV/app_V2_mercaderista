@@ -28,6 +28,7 @@ import '../presentation/screens/admin/reports/form_answers_screen.dart';
 import '../presentation/screens/admin/material_pop/material_pop_screen.dart';
 import '../presentation/screens/admin/material_pop/register_movement_screen.dart';
 import '../presentation/screens/admin/material_pop/edit_material_screen.dart';
+import '../presentation/screens/profile/profile_screen.dart';
 import '../core/models/pop_material.dart';
 
 /// Configuración de rutas de la aplicación
@@ -241,6 +242,13 @@ class AppRouter {
           final eventId = state.pathParameters['id']!;
           return EventCheckInScreen(eventId: eventId);
         },
+      ),
+
+      // Perfil (accesible desde ambos roles)
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
 
       // TODO: Agregar más rutas según se implementen las pantallas

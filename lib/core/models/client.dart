@@ -437,23 +437,27 @@ class ClientVisit {
   final String id;
   final String clientCoCli;
   final String mercaderistaId;
+  final String? mercaderistaNombre;
+  final String? rutaNombre;
   final DateTime visitedAt;
   final double? latitude;
   final double? longitude;
   final String? notes;
   final List<String>? photos;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   const ClientVisit({
     required this.id,
     required this.clientCoCli,
     required this.mercaderistaId,
+    this.mercaderistaNombre,
+    this.rutaNombre,
     required this.visitedAt,
     this.latitude,
     this.longitude,
     this.notes,
     this.photos,
-    required this.createdAt,
+    this.createdAt,
   });
 
   factory ClientVisit.fromJson(Map<String, dynamic> json) {
@@ -486,7 +490,7 @@ class ClientVisit {
       'longitude': longitude,
       'notes': notes,
       'photos': photos,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt?.toIso8601String(),
     };
   }
 }
