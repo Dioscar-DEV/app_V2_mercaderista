@@ -111,7 +111,7 @@ class _MaterialPopScreenState extends ConsumerState<MaterialPopScreen>
 // ============================================
 // TAB DE STOCK
 // ============================================
-class _StockTab extends ConsumerWidget {
+class _StockTab extends ConsumerStatefulWidget {
   final String? sedeApp;
   final String? filterMarca;
   final ValueChanged<String?> onFilterChanged;
@@ -119,8 +119,22 @@ class _StockTab extends ConsumerWidget {
   const _StockTab({this.sedeApp, this.filterMarca, required this.onFilterChanged});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stockAsync = ref.watch(popStockProvider(sedeApp));
+  ConsumerState<_StockTab> createState() => _StockTabState();
+}
+
+class _StockTabState extends ConsumerState<_StockTab> {
+  final _searchController = TextEditingController();
+  String? _filterStock; // null=todos, 'negativo', 'bajo'
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stockAsync = ref.watch(popStockProvider(widget.sedeApp));
 
     return Column(
       children: [
@@ -131,34 +145,78 @@ class _StockTab extends ConsumerWidget {
             children: [
               _FilterChip(
                 label: 'Todas',
-                selected: filterMarca == null,
-                onTap: () => onFilterChanged(null),
+                selected: widget.filterMarca == null,
+                onTap: () => widget.onFilterChanged(null),
               ),
               const SizedBox(width: 8),
               _FilterChip(
                 label: 'Shell',
-                selected: filterMarca == 'SHELL',
-                onTap: () => onFilterChanged('SHELL'),
+                selected: widget.filterMarca == 'SHELL',
+                onTap: () => widget.onFilterChanged('SHELL'),
                 color: Colors.red,
               ),
               const SizedBox(width: 8),
               _FilterChip(
                 label: 'Qualid',
-                selected: filterMarca == 'QUALID',
-                onTap: () => onFilterChanged('QUALID'),
+                selected: widget.filterMarca == 'QUALID',
+                onTap: () => widget.onFilterChanged('QUALID'),
                 color: Colors.blue,
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'Negativos',
+                selected: _filterStock == 'negativo',
+                onTap: () => setState(() => _filterStock = _filterStock == 'negativo' ? null : 'negativo'),
+                color: Colors.red[800],
+              ),
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: 'Bajo',
+                selected: _filterStock == 'bajo',
+                onTap: () => setState(() => _filterStock = _filterStock == 'bajo' ? null : 'bajo'),
+                color: Colors.orange,
               ),
             ],
           ),
         ),
+        // Buscador
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar material...',
+              isDense: true,
+              prefixIcon: const Icon(Icons.search, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: stockAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
             data: (stocks) {
-              final filtered = filterMarca == null
+              var filtered = widget.filterMarca == null
                   ? stocks
-                  : stocks.where((s) => s.material?.marca == filterMarca).toList();
+                  : stocks.where((s) => s.material?.marca == widget.filterMarca).toList();
+
+              // Filtro por stock
+              if (_filterStock == 'negativo') {
+                filtered = filtered.where((s) => s.cantidad < 0).toList();
+              } else if (_filterStock == 'bajo') {
+                filtered = filtered.where((s) => s.cantidad >= 0 && s.cantidad <= 5).toList();
+              }
+
+              // Filtro por búsqueda
+              final search = _searchController.text.trim().toLowerCase();
+              if (search.isNotEmpty) {
+                filtered = filtered.where((s) =>
+                    s.material?.nombre.toLowerCase().contains(search) ?? false).toList();
+              }
 
               if (filtered.isEmpty) {
                 return const Center(
@@ -167,9 +225,7 @@ class _StockTab extends ConsumerWidget {
                     children: [
                       Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
                       SizedBox(height: 16),
-                      Text('Sin stock registrado', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                      SizedBox(height: 8),
-                      Text('Registra un ingreso para comenzar', style: TextStyle(color: Colors.grey)),
+                      Text('Sin resultados', style: TextStyle(color: Colors.grey, fontSize: 16)),
                     ],
                   ),
                 );
@@ -233,9 +289,16 @@ class _StockCard extends StatelessWidget {
         subtitle: Row(
           children: [
             Text(
-              '${material.marca} - ${material.tipoMaterial}',
+              material.marca,
               style: TextStyle(fontSize: 11, color: Colors.grey[600]),
             ),
+            if (material.costoUnitario > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                '\$${material.costoUnitario.toStringAsFixed(2)}/${material.unidadAbreviada}',
+                style: TextStyle(fontSize: 11, color: Colors.blue[600], fontWeight: FontWeight.w500),
+              ),
+            ],
             if (material.isLinked) ...[
               const SizedBox(width: 6),
               Icon(Icons.link, size: 12, color: Colors.green[400]),
@@ -253,10 +316,10 @@ class _StockCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            '${stock.cantidad}',
+            '${stock.cantidad} ${material.unidadAbreviada}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 14,
               color: isNegative ? Colors.red : isLow ? Colors.orange : Colors.green[700],
             ),
           ),
@@ -337,7 +400,7 @@ class _MovementsTab extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${isIngreso ? "Ingreso" : "Egreso"} - ${mov.sedeApp}',
+                        '${isIngreso ? "Ingreso" : "Egreso"} - ${mov.sedeDisplayName}${mov.ciudad != null ? " · ${mov.ciudad}" : ""}',
                         style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                       if (mov.observaciones != null && mov.observaciones!.isNotEmpty)

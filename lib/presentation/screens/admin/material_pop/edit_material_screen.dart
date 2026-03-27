@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/models/pop_material.dart';
 import '../../../../config/supabase_config.dart';
 import '../../../../config/theme_config.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/pop_provider.dart';
 
 class EditMaterialScreen extends ConsumerStatefulWidget {
@@ -20,11 +21,14 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
   late TextEditingController _nombreController;
   late TextEditingController _linkedQuestionController;
   late TextEditingController _linkedOptionController;
+  late TextEditingController _costoController;
   late String _marca;
   late String _tipoMaterial;
   late String _categoria;
+  late String _unidadMedida;
   bool _isSubmitting = false;
   bool _isLinked = false;
+  bool _isOwner = false;
 
   static const _questionOptions = [
     'Entregables Shell',
@@ -52,9 +56,11 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
     _nombreController = TextEditingController(text: mat?.nombre ?? '');
     _linkedQuestionController = TextEditingController(text: mat?.linkedQuestionPattern ?? '');
     _linkedOptionController = TextEditingController(text: mat?.linkedOptionPattern ?? '');
+    _costoController = TextEditingController(text: mat != null && mat.costoUnitario > 0 ? mat.costoUnitario.toString() : '');
     _marca = mat?.marca ?? 'SHELL';
     _tipoMaterial = mat?.tipoMaterial ?? 'TRADE';
     _categoria = mat?.categoria ?? 'ENTREGABLE';
+    _unidadMedida = mat?.unidadMedida ?? 'unidad';
     _isLinked = mat?.isLinked ?? false;
   }
 
@@ -63,11 +69,15 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
     _nombreController.dispose();
     _linkedQuestionController.dispose();
     _linkedOptionController.dispose();
+    _costoController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final userAsync = ref.watch(currentUserProvider);
+    _isOwner = userAsync.valueOrNull?.isOwner ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Material' : 'Nuevo Material'),
@@ -145,6 +155,47 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
                 DropdownMenuItem(value: 'EXTERIOR', child: Text('Exterior')),
               ],
               onChanged: (v) => setState(() => _categoria = v!),
+            ),
+            const SizedBox(height: 16),
+
+            // Unidad de medida y costo
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _unidadMedida,
+                    decoration: const InputDecoration(
+                      labelText: 'Unidad de medida',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.straighten),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'unidad', child: Text('Unidad')),
+                      DropdownMenuItem(value: 'metro', child: Text('Metro')),
+                      DropdownMenuItem(value: 'litro', child: Text('Litro')),
+                      DropdownMenuItem(value: 'kilogramo', child: Text('Kilogramo')),
+                      DropdownMenuItem(value: 'rollo', child: Text('Rollo')),
+                      DropdownMenuItem(value: 'caja', child: Text('Caja')),
+                    ],
+                    onChanged: (v) => setState(() => _unidadMedida = v!),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _costoController,
+                    enabled: _isOwner,
+                    decoration: InputDecoration(
+                      labelText: 'Costo unitario',
+                      border: const OutlineInputBorder(),
+                      helperText: !_isOwner ? 'Solo Owner' : null,
+                      prefixIcon: Icon(Icons.attach_money),
+                      hintText: '0.00',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
 
@@ -302,11 +353,14 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
     try {
       final questionText = _linkedQuestionController.text.trim();
       final isNumeric = _isNumericQuestion(questionText);
+      final costo = double.tryParse(_costoController.text.trim()) ?? 0;
       final data = {
         'nombre': _nombreController.text.trim(),
         'marca': _marca,
         'tipo_material': _tipoMaterial,
         'categoria': _categoria,
+        'unidad_medida': _unidadMedida,
+        'costo_unitario': costo,
         'linked_question_pattern': _isLinked ? questionText : null,
         'linked_option_pattern': _isLinked
             ? (isNumeric ? questionText : _linkedOptionController.text.trim())
@@ -365,11 +419,22 @@ class _EditMaterialScreenState extends ConsumerState<EditMaterialScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
+                // Primero eliminar stock y movimientos relacionados
+                await SupabaseConfig.client
+                    .from('pop_movements')
+                    .delete()
+                    .eq('material_id', widget.material!.id);
+                await SupabaseConfig.client
+                    .from('pop_stock')
+                    .delete()
+                    .eq('material_id', widget.material!.id);
                 await SupabaseConfig.client
                     .from('pop_materials')
-                    .update({'is_active': false})
+                    .delete()
                     .eq('id', widget.material!.id);
                 ref.invalidate(popMaterialsProvider);
+                ref.invalidate(popStockProvider);
+                ref.invalidate(popMovementsProvider);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Material eliminado'), backgroundColor: Colors.green),

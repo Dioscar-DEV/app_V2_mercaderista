@@ -19,15 +19,33 @@ class _RegisterMovementScreenState
     extends ConsumerState<RegisterMovementScreen> {
   String _tipoMovimiento = 'ingreso'; // ingreso o egreso
   String? _filterMarca;
+  String? _selectedSede;
+  String? _selectedCiudad;
   final Map<String, int> _selectedMaterials = {}; // materialId -> cantidad
   final _observacionesController = TextEditingController();
   final _rifController = TextEditingController();
+  final _searchController = TextEditingController();
   bool _isSubmitting = false;
+
+  static const Map<String, List<String>> _ciudadesPorSede = {
+    'grupo_disbattery': ['Caracas', 'Falcón', 'Lara', 'Aragua', 'Miranda', 'Portuguesa', 'Yaracuy'],
+    'oceano_pacifico': ['Puerto La Cruz', 'Puerto Ordaz', 'Maturín', 'Margarita', 'El Tigre'],
+    'blitz_2000': ['Valencia', 'Calabozo'],
+    'grupo_victoria': ['San Cristóbal', 'Maracaibo', 'Barinas', 'Mérida', 'El Vigía', 'Santa Bárbara', 'Valera'],
+  };
+
+  static const Map<String, String> _sedeDisplayNames = {
+    'grupo_disbattery': 'Centro-Capital',
+    'oceano_pacifico': 'Oriente',
+    'blitz_2000': 'Centro-Llanos',
+    'grupo_victoria': 'Occidente',
+  };
 
   @override
   void dispose() {
     _observacionesController.dispose();
     _rifController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -126,7 +144,73 @@ class _RegisterMovementScreenState
             ),
           ),
 
-          // Filtros por marca
+          // Sede y ciudad
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Builder(
+              builder: (context) {
+                final user = ref.watch(currentUserProvider).valueOrNull;
+                final isOwner = user?.isOwner ?? false;
+
+                // Si es supervisor, su sede se fija automáticamente
+                if (!isOwner && user?.sede != null) {
+                  _selectedSede ??= user!.sede!.value;
+                }
+
+                return Row(
+                  children: [
+                    // Sede: solo owners eligen, supervisores tienen la suya fija
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedSede,
+                        decoration: const InputDecoration(
+                          labelText: 'Sede',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: isOwner
+                            ? _sedeDisplayNames.entries
+                                .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                                .toList()
+                            : [
+                                if (_selectedSede != null)
+                                  DropdownMenuItem(
+                                    value: _selectedSede,
+                                    child: Text(_sedeDisplayNames[_selectedSede] ?? _selectedSede!),
+                                  ),
+                              ],
+                        onChanged: isOwner
+                            ? (v) => setState(() {
+                                  _selectedSede = v;
+                                  _selectedCiudad = null;
+                                })
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Ciudad
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedCiudad,
+                        decoration: const InputDecoration(
+                          labelText: 'Ciudad',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: (_ciudadesPorSede[_selectedSede] ?? [])
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedCiudad = v),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Filtros por marca + buscador
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -136,6 +220,20 @@ class _RegisterMovementScreenState
                 _buildChip('Shell', _filterMarca == 'SHELL', () => setState(() => _filterMarca = 'SHELL'), color: Colors.red),
                 const SizedBox(width: 8),
                 _buildChip('Qualid', _filterMarca == 'QUALID', () => setState(() => _filterMarca = 'QUALID'), color: Colors.blue),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar...',
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
               ],
             ),
           ),
@@ -147,9 +245,13 @@ class _RegisterMovementScreenState
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (materials) {
-                final filtered = _filterMarca == null
+                var filtered = _filterMarca == null
                     ? materials
                     : materials.where((m) => m.marca == _filterMarca).toList();
+                final search = _searchController.text.trim().toLowerCase();
+                if (search.isNotEmpty) {
+                  filtered = filtered.where((m) => m.nombre.toLowerCase().contains(search)).toList();
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -256,6 +358,21 @@ class _RegisterMovementScreenState
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   const SizedBox(height: 8),
+                  // Ciudad
+                  DropdownButtonFormField<String>(
+                    value: _selectedCiudad,
+                    decoration: InputDecoration(
+                      labelText: 'Ciudad *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: (_ciudadesPorSede[_selectedSede] ?? [])
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedCiudad = v),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _observacionesController,
                     decoration: InputDecoration(
@@ -344,23 +461,34 @@ class _RegisterMovementScreenState
 
   Future<void> _submit() async {
     if (_selectedMaterials.isEmpty) return;
+    if (_selectedSede == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una sede'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    if (_selectedCiudad == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una ciudad'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final user = ref.read(currentUserProvider).valueOrNull;
-      final sedeApp = user?.sede?.value ?? 'blitz_2000';
       final userId = SupabaseConfig.currentUser?.id;
 
       final movements = _selectedMaterials.entries.map((entry) => {
             'material_id': entry.key,
-            'sede_app': sedeApp,
+            'sede_app': _selectedSede,
             'tipo': _tipoMovimiento,
             'cantidad': entry.value,
             'observaciones': _observacionesController.text.trim().isEmpty
                 ? null
                 : _observacionesController.text.trim(),
             'registrado_por': userId,
+            'ciudad': _selectedCiudad,
           }).toList();
 
       await SupabaseConfig.client.from('pop_movements').insert(movements);

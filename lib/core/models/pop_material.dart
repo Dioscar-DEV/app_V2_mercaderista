@@ -7,6 +7,8 @@ class PopMaterial {
   final bool isActive;
   final String? linkedQuestionPattern; // Patrón de pregunta vinculada
   final String? linkedOptionPattern; // Patrón de opción vinculada
+  final String unidadMedida; // unidad, metro, litro, kilogramo, rollo, caja
+  final double costoUnitario; // Costo por unidad de medida
 
   const PopMaterial({
     required this.id,
@@ -17,6 +19,8 @@ class PopMaterial {
     this.isActive = true,
     this.linkedQuestionPattern,
     this.linkedOptionPattern,
+    this.unidadMedida = 'unidad',
+    this.costoUnitario = 0,
   });
 
   bool get isLinked => linkedQuestionPattern != null && linkedOptionPattern != null;
@@ -31,7 +35,20 @@ class PopMaterial {
       isActive: json['is_active'] as bool? ?? true,
       linkedQuestionPattern: json['linked_question_pattern'] as String?,
       linkedOptionPattern: json['linked_option_pattern'] as String?,
+      unidadMedida: json['unidad_medida'] as String? ?? 'unidad',
+      costoUnitario: (json['costo_unitario'] as num?)?.toDouble() ?? 0,
     );
+  }
+
+  String get unidadAbreviada {
+    switch (unidadMedida) {
+      case 'metro': return 'm';
+      case 'litro': return 'L';
+      case 'kilogramo': return 'kg';
+      case 'rollo': return 'rollo';
+      case 'caja': return 'caja';
+      default: return 'ud';
+    }
   }
 
   Map<String, dynamic> toInsertJson() {
@@ -43,6 +60,8 @@ class PopMaterial {
       'is_active': isActive,
       'linked_question_pattern': linkedQuestionPattern,
       'linked_option_pattern': linkedOptionPattern,
+      'unidad_medida': unidadMedida,
+      'costo_unitario': costoUnitario,
     };
   }
 }
@@ -91,6 +110,7 @@ class PopMovement {
   final String? registradoPor;
   final DateTime? createdAt;
   final PopMaterial? material;
+  final String? ciudad;
 
   const PopMovement({
     required this.id,
@@ -103,6 +123,7 @@ class PopMovement {
     this.registradoPor,
     this.createdAt,
     this.material,
+    this.ciudad,
   });
 
   factory PopMovement.fromJson(Map<String, dynamic> json) {
@@ -121,7 +142,19 @@ class PopMovement {
       material: json['pop_materials'] != null
           ? PopMaterial.fromJson(json['pop_materials'] as Map<String, dynamic>)
           : null,
+      ciudad: json['ciudad'] as String?,
     );
+  }
+
+  /// Nombre geográfico de la sede
+  String get sedeDisplayName {
+    switch (sedeApp) {
+      case 'grupo_disbattery': return 'Centro-Capital';
+      case 'oceano_pacifico': return 'Oriente';
+      case 'blitz_2000': return 'Centro-Llanos';
+      case 'grupo_victoria': return 'Occidente';
+      default: return sedeApp;
+    }
   }
 
   Map<String, dynamic> toInsertJson() {
@@ -133,6 +166,7 @@ class PopMovement {
       if (observaciones != null) 'observaciones': observaciones,
       if (rifCliente != null) 'rif_cliente': rifCliente,
       if (registradoPor != null) 'registrado_por': registradoPor,
+      if (ciudad != null) 'ciudad': ciudad,
     };
   }
 }
