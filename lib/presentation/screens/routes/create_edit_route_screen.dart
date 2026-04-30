@@ -48,11 +48,13 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
   Future<void> _loadRouteData() async {
     final route = await ref.read(routeByIdProvider(widget.routeId!).future);
     if (route != null) {
+      final mercaderistas = await ref.read(activeMercaderistasProvider.future);
+      final mercaderistaInList = mercaderistas.any((m) => m.id == route.mercaderistaId);
       setState(() {
         _nameController.text = route.name;
         _notesController.text = route.notes ?? '';
         _selectedDate = route.scheduledDate;
-        _selectedMercaderistaId = route.mercaderistaId;
+        _selectedMercaderistaId = mercaderistaInList ? route.mercaderistaId : null;
         _selectedRouteTypeId = route.routeTypeId;
         _selectedClientIds = route.clients?.map((c) => c.clientId).toList() ?? [];
       });
@@ -505,7 +507,6 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           mercaderistaId: _selectedMercaderistaId!,
           routeTypeId: _selectedRouteTypeId,
           notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-          totalClients: _selectedClientIds.length,
           brands: _selectedBrands,
         );
         await repository.updateRoute(updated);
