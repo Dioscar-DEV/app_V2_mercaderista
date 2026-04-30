@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/supabase_config.dart';
 import '../../core/models/route.dart';
@@ -624,15 +624,25 @@ class RouteRepository {
 
     final createdVisit = RouteVisit.fromJson(visitResponse);
 
-    // Insertar las respuestas
+    // Insertar las respuestas — si falla, hacer rollback del visit para evitar huérfanos
     if (answers.isNotEmpty) {
-      final answersToInsert = answers.map((a) {
-        final json = a.toInsertJson();
-        json['visit_id'] = createdVisit.id;
-        return json;
-      }).toList();
+      try {
+        final answersToInsert = answers.map((a) {
+          final json = a.toInsertJson();
+          json['visit_id'] = createdVisit.id;
+          return json;
+        }).toList();
 
-      await _client.from('route_visit_answers').insert(answersToInsert);
+        await _client.from('route_visit_answers').insert(answersToInsert);
+      } catch (e) {
+        // Rollback manual: borrar el visit huérfano que acabamos de crear
+        try {
+          await _client.from('route_visits').delete().eq('id', createdVisit.id);
+        } catch (deleteError) {
+          debugPrint('Failed to rollback orphan visit ${createdVisit.id}: $deleteError');
+        }
+        rethrow;
+      }
     }
 
     return createdVisit;

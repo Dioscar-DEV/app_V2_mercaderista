@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'app.dart';
 import 'config/supabase_config.dart';
 
 /// Punto de entrada principal de la aplicación
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Usar path URL strategy en web (sin #) para que los enlaces de
+  // recuperación de Supabase (#access_token=...) funcionen correctamente
+  usePathUrlStrategy();
 
   // Configurar orientación de la pantalla (solo portrait)
   await SystemChrome.setPreferredOrientations([

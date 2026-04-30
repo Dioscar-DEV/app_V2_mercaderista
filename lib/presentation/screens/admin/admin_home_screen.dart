@@ -50,8 +50,8 @@ final adminStatsProvider = FutureProvider.family<AdminStats, AppUser>((ref, user
     final List<dynamic> mercData = await mq;
     debugPrint('[AdminStats] Mercaderistas: ${mercData.length}');
 
-    // 4. Total clientes (solo co_cli para minimizar data)
-    var clq = sb.from('clients').select('co_cli');
+    // 4. Total clientes (solo B2C y FWS)
+    var clq = sb.from('clients').select('co_cli').or('tip_cli.like.B2C%,tip_cli.like.FWS%');
     if (filterBySede) clq = clq.eq('sede_app', sede!);
     final List<dynamic> clientsData = await clq;
     debugPrint('[AdminStats] Clientes: ${clientsData.length}');
@@ -276,6 +276,13 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       subtitle: 'Analytics y reportes',
                       color: Colors.green,
                       onTap: () => context.push('/admin/reports'),
+                    ),
+                    _ModuleCard(
+                      icon: Icons.vpn_key,
+                      title: 'Generar Enlaces',
+                      subtitle: 'Recuperación de contraseña',
+                      color: Colors.indigo,
+                      onTap: () => context.push('/admin/generate-recovery-link'),
                     ),
                     _ModuleCard(
                       icon: Icons.logout,

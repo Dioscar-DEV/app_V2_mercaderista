@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/auth/login_screen_new.dart';
 import '../presentation/screens/auth/register_screen.dart';
+import '../presentation/screens/auth/update_password_screen.dart';
 import '../presentation/screens/mercaderista/home_screen.dart';
 import '../presentation/screens/admin/admin_home_screen.dart';
 import '../presentation/screens/admin/users_list_screen.dart';
@@ -28,6 +29,7 @@ import '../presentation/screens/admin/reports/form_answers_screen.dart';
 import '../presentation/screens/admin/material_pop/material_pop_screen.dart';
 import '../presentation/screens/admin/material_pop/register_movement_screen.dart';
 import '../presentation/screens/admin/material_pop/edit_material_screen.dart';
+import '../presentation/screens/admin/generate_recovery_link_screen.dart';
 import '../presentation/screens/profile/profile_screen.dart';
 import '../core/models/pop_material.dart';
 
@@ -54,6 +56,11 @@ class AppRouter {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/update-password',
+        name: 'update_password',
+        builder: (context, state) => const UpdatePasswordScreen(),
       ),
 
       // Rutas del mercaderista
@@ -199,6 +206,12 @@ class AppRouter {
             path: 'material-pop',
             name: 'material_pop',
             builder: (context, state) => const MaterialPopScreen(),
+          ),
+          // Generar enlace de recuperación de contraseña
+          GoRoute(
+            path: 'generate-recovery-link',
+            name: 'generate_recovery_link',
+            builder: (context, state) => const GenerateRecoveryLinkScreen(),
           ),
           GoRoute(
             path: 'material-pop/registro',

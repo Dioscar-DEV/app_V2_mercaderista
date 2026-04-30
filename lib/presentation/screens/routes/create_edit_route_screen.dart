@@ -477,6 +477,8 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
   Future<void> _saveRoute() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final isEditing = widget.routeId != null;
+
     if (!_useTemplate && _selectedClientIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Debe seleccionar al menos un cliente')),
@@ -491,12 +493,46 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
       if (currentUser == null) throw Exception('Usuario no autenticado');
 
       final repository = ref.read(routeRepositoryProvider);
-      
-      AppRoute? createdRoute;
 
-      if (_useTemplate && _selectedTemplateId != null) {
-        // Crear desde plantilla
-        createdRoute = await repository.createRouteFromTemplate(
+      if (isEditing) {
+        // --- MODO EDICIÓN ---
+        final existing = await repository.getRouteById(widget.routeId!);
+        if (existing == null) throw Exception('Ruta no encontrada');
+
+        final updated = existing.copyWith(
+          name: _nameController.text.trim(),
+          scheduledDate: _selectedDate,
+          mercaderistaId: _selectedMercaderistaId!,
+          routeTypeId: _selectedRouteTypeId,
+          notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          totalClients: _selectedClientIds.length,
+          brands: _selectedBrands,
+        );
+        await repository.updateRoute(updated);
+
+        // Sincronizar clientes: quitar los removidos, agregar los nuevos
+        final oldIds = existing.clients?.map((c) => c.clientId).toSet() ?? {};
+        final newIds = _selectedClientIds.toSet();
+        final toRemove = oldIds.difference(newIds);
+        final toAdd = newIds.difference(oldIds).toList();
+
+        for (final id in toRemove) {
+          await repository.removeClientFromRoute(
+            routeId: widget.routeId!,
+            clientId: id,
+          );
+        }
+        if (toAdd.isNotEmpty) {
+          final keepCount = _selectedClientIds.where((id) => oldIds.contains(id)).length;
+          await repository.appendClientsToRoute(
+            routeId: widget.routeId!,
+            clientIds: toAdd,
+            existingCount: keepCount,
+          );
+        }
+      } else if (_useTemplate && _selectedTemplateId != null) {
+        // --- CREAR DESDE PLANTILLA ---
+        await repository.createRouteFromTemplate(
           templateId: _selectedTemplateId!,
           mercaderistaId: _selectedMercaderistaId!,
           scheduledDate: _selectedDate,
@@ -507,7 +543,7 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           brands: _selectedBrands,
         );
       } else {
-        // Crear manualmente
+        // --- CREAR MANUAL ---
         final route = AppRoute(
           id: '',
           mercaderistaId: _selectedMercaderistaId!,
@@ -523,9 +559,8 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
           brands: _selectedBrands,
         );
 
-        createdRoute = await repository.createRoute(route, adminName: currentUser.fullName);
+        final createdRoute = await repository.createRoute(route, adminName: currentUser.fullName);
 
-        // Agregar clientes
         if (_selectedClientIds.isNotEmpty) {
           await repository.addClientsToRoute(
             routeId: createdRoute.id,
@@ -537,8 +572,8 @@ class _CreateEditRouteScreenState extends ConsumerState<CreateEditRouteScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ruta creada exitosamente'),
+        SnackBar(
+          content: Text(isEditing ? 'Ruta actualizada exitosamente' : 'Ruta creada exitosamente'),
           backgroundColor: Colors.green,
         ),
       );

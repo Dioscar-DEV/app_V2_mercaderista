@@ -151,11 +151,40 @@ class AuthRepository {
   /// Recupera la contraseña
   Future<void> resetPassword(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'https://disbattery-trade-app.vercel.app/update-password',
+      );
     } on AuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
       throw Exception('Error al recuperar contraseña: $e');
+    }
+  }
+
+  /// Genera un enlace de recuperación de contraseña sin enviar email (para administradores)
+  /// Llama al edge function 'generate-recovery-link' que usa el service_role key
+  Future<String> generatePasswordRecoveryLink(String email) async {
+    try {
+      final response = await _client.functions.invoke(
+        'generate-recovery-link',
+        body: {'email': email},
+      );
+
+      final data = response.data as Map<String, dynamic>?;
+
+      if (data == null || data['success'] != true) {
+        throw Exception(data?['error']?.toString() ?? 'No se pudo generar el enlace');
+      }
+
+      final link = data['link'] as String?;
+      if (link == null || link.isEmpty) {
+        throw Exception('No se pudo generar el enlace');
+      }
+
+      return link;
+    } catch (e) {
+      throw Exception('Error al generar enlace de recuperación: $e');
     }
   }
 

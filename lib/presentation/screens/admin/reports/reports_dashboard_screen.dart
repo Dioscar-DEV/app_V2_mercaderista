@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../providers/reports_provider.dart';
 import '../../../../core/models/report_models.dart';
 import '../../../../core/enums/sede.dart';
+import 'executive/executive_dashboard_screen.dart';
 
 /// Pantalla principal del módulo de reportes con KPIs, gráficas y acceso rápido.
 class ReportsDashboardScreen extends ConsumerStatefulWidget {
@@ -16,7 +17,21 @@ class ReportsDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsDashboardScreenState
-    extends ConsumerState<ReportsDashboardScreen> {
+    extends ConsumerState<ReportsDashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
   /// Convierte un string hexadecimal de color (e.g. "#FF5733" o "FF5733") a [Color].
   Color _parseColor(String hex) {
     String sanitized = hex.replaceAll('#', '');
@@ -75,13 +90,42 @@ class _ReportsDashboardScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reportes'),
+        bottom: isOwner
+            ? TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Operativo'),
+                  Tab(text: 'Ejecutivo'),
+                ],
+              )
+            : null,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Filter chips ──
+      body: isOwner
+          ? TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOperativeTab(statsAsync, trendsAsync, breakdownAsync, selectedIndex, isOwner, currentFilter),
+                const ExecutiveDashboardScreen(),
+              ],
+            )
+          : _buildOperativeTab(statsAsync, trendsAsync, breakdownAsync, selectedIndex, isOwner, currentFilter),
+    );
+  }
+
+  Widget _buildOperativeTab(
+    AsyncValue<DashboardStats> statsAsync,
+    AsyncValue<List<DailyTrend>> trendsAsync,
+    AsyncValue<RouteTypeBreakdown> breakdownAsync,
+    int selectedIndex,
+    bool isOwner,
+    ReportsFilter currentFilter,
+  ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Filter chips ──
             _buildFilterChips(selectedIndex),
             const SizedBox(height: 8),
 
@@ -128,8 +172,7 @@ class _ReportsDashboardScreenState
             _buildQuickAccessGrid(),
           ],
         ),
-      ),
-    );
+      );
   }
 
   // ───────────────────────────── Sede Selector ─────────────────────────────
